@@ -9,7 +9,6 @@ from backend import enumerate_monitors, set_input, parse_code
 
 APP_DIR = Path(os.environ.get('APPDATA', str(Path.home()))) / 'OpenMonitorSwitch'
 CONFIG_PATH = APP_DIR / 'config.json'
-DEFAULT_MODELS = ['Dell P2314H', 'Samsung LS27AG32X', 'Samsung LT27T35']
 
 
 class Controller:
