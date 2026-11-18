@@ -126,13 +126,17 @@ class Application(tk.Tk):
             enabled = tk.BooleanVar(value=entry.get('enabled', True))
             fields = ttk.Frame(frame)
             fields.pack(fill='x')
-            ttk.Label(fields, text='Nome').pack(side='left')
-            ttk.Entry(fields, textvariable=label, width=27).pack(side='left', padx=(7, 17))
-            ttk.Label(fields, text='PC A').pack(side='left')
-            ttk.Entry(fields, textvariable=a, width=7).pack(side='left', padx=(7, 17))
-            ttk.Label(fields, text='PC B').pack(side='left')
-            ttk.Entry(fields, textvariable=b, width=7).pack(side='left', padx=(7, 17))
-            ttk.Checkbutton(fields, text='Ativo', variable=enabled).pack(side='left')
+            title_row = ttk.Frame(fields)
+            title_row.pack(fill='x')
+            ttk.Label(title_row, text='Nome').pack(side='left')
+            ttk.Entry(title_row, textvariable=label, width=36).pack(side='left', padx=(9, 0), fill='x', expand=True)
+            ports = ttk.Frame(fields)
+            ports.pack(fill='x', pady=(10, 0))
+            ttk.Label(ports, text='PC A').pack(side='left')
+            ttk.Entry(ports, textvariable=a, width=7).pack(side='left', padx=(7, 18))
+            ttk.Label(ports, text='PC B').pack(side='left')
+            ttk.Entry(ports, textvariable=b, width=7).pack(side='left', padx=(7, 18))
+            ttk.Checkbutton(ports, text='Ativo', variable=enabled).pack(side='left')
             buttons = ttk.Frame(frame)
             buttons.pack(anchor='w', pady=(12, 0))
             ttk.Button(buttons, text='Salvar', style='Action.TButton',
@@ -165,7 +169,8 @@ class Application(tk.Tk):
         monitor_from_window.argtypes = [wintypes.HWND, wintypes.DWORD]
         monitor_from_window.restype = wintypes.HMONITOR
         from backend import _enumerate
-        display_handles = {display: int(hmon) for hmon, display, bounds in _enumerate()}
+        display_handles = {display: (hmon.value if hasattr(hmon, 'value') else int(hmon))
+                           for hmon, display, bounds in _enumerate()}
         seen = set()
         failed = []
         for monitor in self.last_monitors:
