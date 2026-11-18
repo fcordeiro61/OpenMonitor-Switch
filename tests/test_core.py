@@ -1,6 +1,7 @@
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from backend import parse_code
 from core import Controller
 
@@ -8,6 +9,10 @@ from core import Controller
 class FakeBackend:
     def __init__(self):
         self.calls = []
+
+    def enumerate_monitors(self):
+        return [SimpleNamespace(id=monitor_id, hardware_id=f'MONITOR\\\\{monitor_id}',
+                                current=None) for monitor_id in ['a|0', 'b|0', 'dell|0', 'samsung|0']]
 
     def set_input(self, monitor_id, code):
         self.calls.append((monitor_id, code))
@@ -27,6 +32,7 @@ class Tests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             backend = FakeBackend()
             ctrl = Controller(Path(d) / 'config.json', backend)
+            ctrl.scan()
             ctrl.register('a|0', 'Dell', '0x0F', '0x03')
             ctrl.register('b|0', 'Samsung', '17', '15')
             result = ctrl.switch_all('B')
@@ -41,6 +47,7 @@ class Tests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             backend = FakeBackend()
             ctrl = Controller(Path(d) / 'config.json', backend)
+            ctrl.scan()
             ctrl.register('dell|0', 'Dell', 15, None)
             ctrl.register('samsung|0', 'Samsung', '', '')
             result = ctrl.switch_all('A')
@@ -50,6 +57,25 @@ class Tests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'não configurada'):
                 ctrl.switch_one('dell|0', 'B')
             self.assertIsNone(ctrl.config['monitors']['samsung|0']['a'])
+
+    def test_reenumeration_and_noop(self):
+        with tempfile.TemporaryDirectory() as d:
+            backend = FakeBackend()
+            ctrl = Controller(Path(d) / 'config.json', backend)
+            ctrl.scan()
+            ctrl.register('a|0', 'Dell', 15, 17)
+            def changed():
+                return [SimpleNamespace(id='a|0', hardware_id='MONITOR\\\\other',
+                                        current=15)]
+            backend.enumerate_monitors = changed
+            with self.assertRaisesRegex(RuntimeError, 'alterou a associação'):
+                ctrl.switch_one('a|0', 'B')
+            self.assertEqual(backend.calls, [])
+            backend.enumerate_monitors = lambda: [
+                SimpleNamespace(id='a|0', hardware_id='MONITOR\\\\a|0', current=15)]
+            result = ctrl.switch_one('a|0', 'A')
+            self.assertTrue(result['unchanged'])
+            self.assertEqual(backend.calls, [])
 
 if __name__ == '__main__':
     unittest.main()
