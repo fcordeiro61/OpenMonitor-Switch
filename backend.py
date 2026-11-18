@@ -9,6 +9,25 @@ VCP_INPUT = 0x60
 SOURCE_CODES = {"VGA": 0x01, "DVI": 0x03, "DisplayPort": 0x0F,
                 "HDMI 1": 0x11, "HDMI 2": 0x12}
 
+# These are common MCCS values, not a complete list of physical ports.
+SOURCE_OPTIONS = tuple(f'{name} ({code})' for name, code in SOURCE_CODES.items())
+
+
+def source_name(code):
+    """Common name for a VCP input value, otherwise show its exact number."""
+    for name, known in SOURCE_CODES.items():
+        if code == known:
+            return name
+    return f'Código {code}' if code is not None else 'Leitura indisponível'
+
+
+def source_option(code):
+    """Display a saved mapping as a named option or an editable custom code."""
+    if code is None:
+        return ''
+    name = source_name(code)
+    return f'{name} ({code})' if code in SOURCE_CODES.values() else str(code)
+
 
 @dataclass
 class Monitor:
@@ -33,7 +52,13 @@ def parse_code(value):
         code = value
     elif isinstance(value, str):
         value = value.strip()
-        code = int(value, 16 if value.lower().startswith('0x') else 10)
+        if value in SOURCE_OPTIONS:
+            code = next(number for name, number in SOURCE_CODES.items()
+                        if value == f'{name} ({number})')
+        elif value in SOURCE_CODES:
+            code = SOURCE_CODES[value]
+        else:
+            code = int(value, 16 if value.lower().startswith('0x') else 10)
     else:
         raise ValueError("Código deve ser inteiro, decimal ou hexadecimal 0xNN")
     if not 0 <= code <= 255:
