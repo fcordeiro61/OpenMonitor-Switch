@@ -1,0 +1,9 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+*.log
+LICENSE:Zone.Identifier README.md:Zone.Identifier api.py:Zone.Identifier app.py:Zone.Identifier backend.py:Zone.Identifier core.py:Zone.Identifier iniciar.bat:Zone.Identifier
+.vscode/
+.idea/
