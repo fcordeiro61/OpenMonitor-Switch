@@ -31,7 +31,7 @@ class Application(tk.Tk):
         super().__init__()
         self.controller = controller
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-        self.title('OpenMonitor Switch — MVP 0.3.5')
+        self.title('OpenMonitor Switch — MVP 0.4')
         self.geometry('1040x720')
         self.minsize(650, 510)
         self.widgets = []
@@ -131,24 +131,35 @@ class Application(tk.Tk):
                 (f'0x{monitor.current:02X} ({monitor.current})'
                  if monitor.current is not None else 'não disponível'),
                 foreground='#555').pack(anchor='w', pady=(0, 5))
-            # Show common MCCS inputs for reference, never imply that all
-            # listed inputs physically exist on the current monitor.
+            # Only show inputs advertised by this monitor, plus the value
+            # actually observed. Never display the entire generic MCCS table.
+            supported = list(monitor.supported_inputs or [])
+            if monitor.current is not None and monitor.current not in supported:
+                supported.append(monitor.current)
             source_row = ttk.Frame(frame)
             source_row.pack(anchor='w', pady=(0, 7))
-            ttk.Label(source_row, text='Entrada ativa:').pack(side='left', padx=(0, 8))
-            options = list(SOURCE_CODES.items())
-            if monitor.current is not None and monitor.current not in SOURCE_CODES.values():
-                options.append((f'Código {monitor.current}', monitor.current))
-            for source_label, source_code in options:
-                active_source = monitor.current is not None and monitor.current == source_code
-                tk.Label(source_row,
-                         text=('● ' if active_source else '') + source_label,
-                         bg='#0875DC' if active_source else '#E9EDF2',
-                         fg='#FFFFFF' if active_source else '#505B67',
-                         padx=9, pady=4,
-                         font=('Segoe UI', 9, 'bold' if active_source else 'normal')
-                         ).pack(side='left', padx=(0, 5))
-            ttk.Label(frame, text='Portas comuns (referência); a lista não confirma entradas físicas.',
+            ttk.Label(source_row, text='Entradas detectadas:').pack(side='left', padx=(0, 8))
+            if supported:
+                for code in supported:
+                    is_active = monitor.current == code
+                    title = source_name(code)
+                    if code not in SOURCE_CODES.values():
+                        title = f'Código {code} (0x{code:02X})'
+                    tk.Button(source_row, text=('● ' if is_active else '') + title,
+                              bg='#0875DC' if is_active else '#E9EDF2',
+                              fg='white' if is_active else '#26384B',
+                              activebackground='#1B7BD0',
+                              relief='flat', cursor='hand2', padx=10, pady=5,
+                              font=('Segoe UI', 9, 'bold' if is_active else 'normal'),
+                              command=lambda mid=monitor.id, val=code, title=title:
+                                  self.choose_input(mid, val, title)
+                              ).pack(side='left', padx=(0, 5))
+            else:
+                ttk.Label(source_row, text='Nenhuma entrada informada via DDC/CI.').pack(side='left')
+            ttk.Label(frame,
+                      text=('Códigos informados pelo monitor via DDC/CI; clique para selecionar.'
+                            if monitor.supported_inputs else
+                            'Capacidades indisponíveis; somente a entrada observada é exibida.'),
                       foreground='#666').pack(anchor='w', pady=(0, 7))
             label = tk.StringVar(value=entry.get('label',
                 name if name not in ('Generic PnP Monitor', 'Generic Non-PnP Monitor')
@@ -205,14 +216,14 @@ class Application(tk.Tk):
             ports = ttk.Frame(fields)
             ports.pack(fill='x', pady=(10, 0))
             ttk.Label(fields,
-                      text='Entradas por monitor: informe o código VCP real (decimal ou 0xNN). '
-                           'Não há portas padrão.',
+                      text='Associe cada PC à entrada correta. Códigos personalizados podem ser digitados.',
                       foreground='#555').pack(anchor='w', pady=(6, 0))
             ttk.Label(ports, text='PC A').pack(side='left')
-            ttk.Combobox(ports, textvariable=a, values=('',) + SOURCE_OPTIONS,
+            choices = ('',) + tuple(source_option(code) for code in supported)
+            ttk.Combobox(ports, textvariable=a, values=choices,
                          width=20, state='normal').pack(side='left', padx=(7, 18))
             ttk.Label(ports, text='PC B').pack(side='left')
-            ttk.Combobox(ports, textvariable=b, values=('',) + SOURCE_OPTIONS,
+            ttk.Combobox(ports, textvariable=b, values=choices,
                          width=20, state='normal').pack(side='left', padx=(7, 18))
             ttk.Checkbutton(ports, text='Ativo', variable=enabled).pack(side='left')
             buttons = ttk.Frame(frame)
@@ -344,6 +355,17 @@ class Application(tk.Tk):
 
         self.status.set(f'Identificação: {len(self._overlays)}/{len(shown)} tela(s) exibida(s).' +
                         (' Falhas: ' + '; '.join(failures) if failures else ''))
+
+    def choose_input(self, monitor_id, code, title):
+        if not messagebox.askyesno(
+                'Confirmar troca de entrada',
+                f'Selecionar {title} no monitor {monitor_id}?\\n\\n'
+                'A tela pode perder o sinal. Isso não altera a associação PC A/PC B.'):
+            return
+        self.task(lambda: self.controller.switch_input(monitor_id, code),
+                  lambda result: self._after_switch(
+                      'Entrada já estava selecionada.' if result.get('unchanged')
+                      else f'Comando enviado: {title} no monitor {monitor_id}.'))
 
     def save_one(self, monitor_id, label, a, b, enabled):
         try:
