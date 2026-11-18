@@ -24,7 +24,7 @@ Ou dê duplo clique em `iniciar.bat`.
 3. Associe os identificadores aos modelos físicos e informe nomes como Dell P2314H, Samsung LS27AG32X e Samsung LT27T35. O aplicativo tenta ler o nome por `EnumDisplayDevicesW` e, quando possível, pelo EDID no Registro do Windows. Se a identificação continuar genérica, o programa **não inventa** o modelo.
 4. Configure para cada monitor os códigos de fonte de **PC A** e **PC B**.
 5. Clique **Salvar** e experimente **→ PC A** ou **→ PC B** por monitor.
-6. Depois de validar os três monitores, use **Todos → PC A/B**.
+6. Depois de validar os monitores detectados, use **Todos → PC A/B**. O aplicativo enumera automaticamente quantas telas estão conectadas; não há parâmetro de quantidade.
 
 Os valores padrão na interface (`15` para A, `17` para B) são *placeholders ilustrativos* — **não** são uma atribuição confiável para o seu setup. Não clique antes de conferir os cabos. A configuração é salva automaticamente em `%APPDATA%\OpenMonitorSwitch\config.json`.
 
@@ -46,12 +46,12 @@ Os valores padrão na interface (`15` para A, `17` para B) são *placeholders il
 - **Samsung LS27AG32X:** HDMI e DisplayPort.
 - **Samsung LT27T35 / série T350:** HDMI e VGA (D-Sub).
 
-Os 3 monitores terão mapeamentos de fonte diferentes.
+Cada monitor pode ter um mapeamento de fonte diferente. A quantidade de monitores não é fixa.
 
 ## Linha de comando
 
 ```powershell
-py -3 app.py scan
+py -3 app.py scan   # detecta automaticamente todos os monitores
 py -3 app.py profile A
 py -3 app.py profile B
 py -3 app.py switch '\\.\DISPLAY1|0' A
