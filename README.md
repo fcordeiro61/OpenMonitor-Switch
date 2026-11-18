@@ -1,4 +1,4 @@
-# OpenMonitor Switch — MVP 0.3.4
+# OpenMonitor Switch — MVP 0.3.5
 
 Aplicativo Windows, open-source (MIT), para alterar a entrada de vídeo de monitores físicos usando DDC/CI e o comando VCP `0x60`. Interface Tkinter e API HTTP opcional. **Sem bibliotecas de terceiros.**
 
@@ -103,6 +103,12 @@ Antes de enviar VCP 0x60, o aplicativo relê a lista de monitores e confere o ha
 - Não implementa KVM de teclado/mouse, nem comuta sinais por software: somente controla o seletor de entrada do hardware.
 - Um monitor que não expõe DDC/CI pela porta/cabo atual pode exigir troca manual ou um switch HDMI/DP externo.
 - IDs por `\\.\DISPLAYN|índice` são temporários por configuração Windows; antes do uso definitivo vamos implementar associação persistente com EDID/serial.
+
+## Entradas nomeadas e destaque da porta ativa
+
+Cada monitor mostra etiquetas com os nomes comuns **VGA, DVI, DisplayPort, HDMI 1, HDMI 2**. Quando a leitura VCP 0x60 corresponde a um desses códigos, a etiqueta fica **azul**. Valores diferentes aparecem como **Código N**, sem identificação falsa (por exemplo, leitura 5 exibe Código 5). A identificação no canto superior direito também mostra a entrada atual. Os nomes comuns são apenas referência; não demonstram que o monitor possui todas essas conexões físicas.
+
+A seleção de PC A e PC B usa listas editáveis com nomes e valores decimais; é possível digitar um código personalizado (como `5` ou `0x05`). **Nenhuma entrada é atribuída automaticamente**.
 
 ## Estado visual da entrada
 
