@@ -31,7 +31,7 @@ class Application(tk.Tk):
         super().__init__()
         self.controller = controller
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-        self.title('OpenMonitor Switch — MVP 0.3.2')
+        self.title('OpenMonitor Switch — MVP 0.3.3')
         self.geometry('1040x720')
         self.minsize(650, 510)
         self.widgets = []
@@ -115,6 +115,9 @@ class Application(tk.Tk):
             ttk.Label(self.list_frame, text='Nenhum monitor físico detectado. Verifique DDC/CI e os cabos.').pack(anchor='w')
         for pos, monitor in enumerate(monitors):
             entry = self.controller.config['monitors'].get(monitor.id, {})
+            if entry.get('hardware_id') and monitor.hardware_id and (
+                    entry['hardware_id'].casefold() != monitor.hardware_id.casefold()):
+                entry = {}
             name = monitor.description
             frame = ttk.LabelFrame(self.list_frame,
                   text=f'{monitor.display.split("DISPLAY")[-1]} — {name}', padding=12,
@@ -319,7 +322,7 @@ class Application(tk.Tk):
     def save_one(self, monitor_id, label, a, b, enabled):
         try:
             self.controller.register(monitor_id, label, a, b, enabled)
-            self.status.set(f'Salvo: {label}')
+            self.status.set(f'Salvo: {label}. Identidade física vinculada.')
         except Exception as exc:
             messagebox.showerror('Erro na configuração', str(exc))
 
@@ -339,7 +342,9 @@ class Application(tk.Tk):
             return
         self.task(lambda: self.controller.switch_one(monitor_id, target),
                   lambda result: self._after_switch(
-                      f'Comando enviado ao monitor {monitor_id}: PC {target}. Estado será relido.'))
+                      (f'{monitor_id}: entrada já selecionada, nenhum comando enviado.'
+                       if result.get('unchanged') else
+                       f'Comando enviado ao monitor {monitor_id}: PC {target}. Estado será relido.')))
 
     def switch_all(self, target):
         try:
