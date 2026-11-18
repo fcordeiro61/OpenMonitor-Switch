@@ -18,6 +18,7 @@ class Monitor:
     index: int
     current: int | None = None
     read_error: str | None = None
+    bounds: tuple[int, int, int, int] | None = None
 
     def to_dict(self):
         return asdict(self)
@@ -90,7 +91,8 @@ def _enumerate():
         info.cbSize = ctypes.sizeof(info)
         if not user32.GetMonitorInfoW(hmon, ctypes.byref(info)):
             return True
-        found.append((hmon, info.szDevice))
+        found.append((hmon, info.szDevice, (info.rcMonitor.left, info.rcMonitor.top,
+                                            info.rcMonitor.right, info.rcMonitor.bottom)))
         return True
     callback = CALLBACK(cb)
     if not user32.EnumDisplayMonitors(None, None, callback, 0):
@@ -123,19 +125,20 @@ def _read(handle):
 
 def enumerate_monitors(read_current=True):
     result = []
-    for hmon, display in _enumerate():
+    for hmon, display, bounds in _enumerate():
         try:
             array, count = _physical(hmon)
         except OSError as exc:
             result.append(Monitor(f'{display}|0', display, 'Não acessível por DDC/CI', 0,
-                                  read_error=str(exc)))
+                                  read_error=str(exc), bounds=bounds))
             continue
         if not array:
             continue
         try:
             for i in range(count):
                 item = array[i]
-                m = Monitor(f'{display}|{i}', display, item.szPhysicalMonitorDescription, i)
+                m = Monitor(f'{display}|{i}', display, item.szPhysicalMonitorDescription, i,
+                            bounds=bounds)
                 if read_current:
                     try:
                         m.current = _read(item.hPhysicalMonitor)
@@ -149,7 +152,7 @@ def enumerate_monitors(read_current=True):
 
 def set_input(monitor_id, value):
     code = parse_code(value)
-    for hmon, display in _enumerate():
+    for hmon, display, bounds in _enumerate():
         if not monitor_id.startswith(display + '|'):
             continue
         try:
