@@ -31,7 +31,7 @@ class Application(tk.Tk):
         super().__init__()
         self.controller = controller
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-        self.title('OpenMonitor Switch — MVP 0.2.1')
+        self.title('OpenMonitor Switch — MVP 0.3')
         self.geometry('1040x720')
         self.minsize(650, 510)
         self.widgets = []
@@ -121,8 +121,8 @@ class Application(tk.Tk):
             label = tk.StringVar(value=entry.get('label',
                 name if name not in ('Generic PnP Monitor', 'Generic Non-PnP Monitor')
                 else f'Monitor {pos + 1}'))
-            a = tk.StringVar(value=str(entry.get('a', 15)))
-            b = tk.StringVar(value=str(entry.get('b', 17)))
+            a = tk.StringVar(value='' if entry.get('a') is None else str(entry['a']))
+            b = tk.StringVar(value='' if entry.get('b') is None else str(entry['b']))
             enabled = tk.BooleanVar(value=entry.get('enabled', True))
             fields = ttk.Frame(frame)
             fields.pack(fill='x')
@@ -142,10 +142,18 @@ class Application(tk.Tk):
             ttk.Button(buttons, text='Salvar', style='Action.TButton',
                        command=lambda m=monitor.id, l=label, av=a, bv=b, en=enabled:
                        self.save_one(m, l.get(), av.get(), bv.get(), en.get())).pack(side='left', padx=(0, 9))
-            ttk.Button(buttons, text='→ PC A', style='Action.TButton',
-                       command=lambda m=monitor.id: self.switch_one(m, 'A')).pack(side='left', padx=(0, 9))
-            ttk.Button(buttons, text='→ PC B', style='Action.TButton',
-                       command=lambda m=monitor.id: self.switch_one(m, 'B')).pack(side='left')
+            button_a = ttk.Button(buttons, text='→ PC A', style='Action.TButton',
+                       command=lambda m=monitor.id: self.switch_one(m, 'A'))
+            button_a.pack(side='left', padx=(0, 9))
+            button_b = ttk.Button(buttons, text='→ PC B', style='Action.TButton',
+                       command=lambda m=monitor.id: self.switch_one(m, 'B'))
+            button_b.pack(side='left')
+            def refresh_buttons(*_):
+                button_a.configure(state='normal' if a.get().strip() else 'disabled')
+                button_b.configure(state='normal' if b.get().strip() else 'disabled')
+            a.trace_add('write', refresh_buttons)
+            b.trace_add('write', refresh_buttons)
+            refresh_buttons()
             self.widgets.append((monitor.id, label, a, b, enabled))
         self.status.set(f'{len(monitors)} monitor(es) encontrado(s). Configuração: {CONFIG_PATH}')
 
@@ -236,11 +244,13 @@ class Application(tk.Tk):
             messagebox.showerror('Configuração inválida', str(exc))
             return
         def success(results):
-            errors = [r for r in results if not r['ok']]
-            ok = len(results) - len(errors)
-            self.status.set(f'PC {target}: {ok} comando(s) enviado(s), {len(errors)} erro(s).')
+            skipped = [r for r in results if r.get('skipped')]
+            errors = [r for r in results if not r['ok'] and not r.get('skipped')]
+            ok = sum(bool(r['ok']) for r in results)
+            self.status.set(f'PC {target}: {ok} enviado(s), {len(skipped)} pendente(s), {len(errors)} erro(s).')
             if errors:
-                messagebox.showwarning('Falhas de envio', '\n'.join(f"{r['id']}: {r['error']}" for r in errors))
+                messagebox.showwarning('Falhas de envio',
+                    '\n'.join(f"{r['id']}: {r['error']}" for r in errors))
         self.task(lambda: self.controller.switch_all(target), success)
 
 
