@@ -1,4 +1,4 @@
-# OpenMonitor Switch — MVP 0.2
+# OpenMonitor Switch — MVP 0.2.1
 
 Aplicativo Windows, open-source (MIT), para alterar a entrada de vídeo de monitores físicos usando DDC/CI e o comando VCP `0x60`. Interface Tkinter e API HTTP opcional. **Sem bibliotecas de terceiros.**
 
@@ -20,8 +20,8 @@ py -3 app.py
 Ou dê duplo clique em `iniciar.bat`.
 
 1. Clique em **Detectar monitores**.
-2. Clique em **Identificar telas**: por 6 segundos cada tela mostra seu identificador `DISPLAYN`, sem alterar a fonte de vídeo. **A ordem de detecção não é necessariamente a ordem física da sua mesa!**
-3. Associe os identificadores aos modelos físicos e informe nomes como Dell P2314H, Samsung LS27AG32X e Samsung LT27T35. Quando o Windows retorna `Generic PnP Monitor`, o programa **não inventa** o modelo.
+2. Clique em **Identificar telas**: por 7 segundos cada tela mostra seu identificador `DISPLAYN`, sem alterar a fonte de vídeo. **A ordem de detecção não é necessariamente a ordem física da sua mesa!**
+3. Associe os identificadores aos modelos físicos e informe nomes como Dell P2314H, Samsung LS27AG32X e Samsung LT27T35. O aplicativo tenta ler o nome por `EnumDisplayDevicesW` e, quando possível, pelo EDID no Registro do Windows. Se a identificação continuar genérica, o programa **não inventa** o modelo.
 4. Configure para cada monitor os códigos de fonte de **PC A** e **PC B**.
 5. Clique **Salvar** e experimente **→ PC A** ou **→ PC B** por monitor.
 6. Depois de validar os três monitores, use **Todos → PC A/B**.
@@ -100,7 +100,7 @@ Todas exigem o header `Authorization: Bearer TOKEN`.
 
 ## Próximas versões
 
-- v0.2: identificação visual de cada tela e remoção de nomes assumidos por ordem de detecção.
+- v0.2.1: identificação visual com verificação do monitor real, ajuste de DPI, leitura do modelo pelo Windows/EDID e layout reorganizado para não cortar botões.
 - Futuro: identificação persistente por EDID, bandeja, hotkeys e testes de ida/volta por monitor.
 - v0.3: agentes nos dois PCs com recuperação/fallback e orquestração segura.
 - v1.0: UI Tauri/Rust, empacotamento EXE, inicialização automática e instalador.
