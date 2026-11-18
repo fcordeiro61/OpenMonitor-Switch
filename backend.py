@@ -43,6 +43,7 @@ class Monitor:
     identity_source: str = 'ddc'
     supported_inputs: list[int] | None = None
     capabilities_error: str | None = None
+    capabilities_raw: str | None = None
 
     def to_dict(self):
         return asdict(self)
@@ -274,17 +275,26 @@ def parse_input_capabilities(source):
 
 
 def _capabilities(handle):
-    length = wintypes.DWORD()
-    if not dxva2.GetCapabilitiesStringLength(handle, ctypes.byref(length)):
-        raise _winerr('Monitor não respondeu à consulta de capacidades')
-    if not 2 <= length.value <= 65536:
-        raise ValueError('Comprimento inválido de capacidades DDC/CI')
-    buffer = ctypes.create_string_buffer(length.value + 1)
-    if not dxva2.CapabilitiesRequestAndCapabilitiesReply(
-            handle, ctypes.cast(buffer, ctypes.c_void_p), length.value):
-        raise _winerr('Monitor não retornou capacidades DDC/CI')
-    raw = buffer.value.decode('ascii', errors='replace')
-    return parse_input_capabilities(raw)
+    """Read raw firmware capabilities. Retry one time on transient DDC errors."""
+    last_error = None
+    for attempt in range(2):
+        length = wintypes.DWORD()
+        if not dxva2.GetCapabilitiesStringLength(handle, ctypes.byref(length)):
+            last_error = _winerr('GetCapabilitiesStringLength falhou')
+            continue
+        if not 2 <= length.value <= 65536:
+            raise ValueError(f'Tamanho de resposta DDC/CI inválido: {length.value}')
+        buffer = ctypes.create_string_buffer(length.value)
+        if not dxva2.CapabilitiesRequestAndCapabilitiesReply(
+                handle, ctypes.cast(buffer, ctypes.c_void_p), length.value):
+            last_error = _winerr('CapabilitiesRequestAndCapabilitiesReply falhou')
+            continue
+        raw = buffer.value.decode('ascii', errors='replace')
+        if not raw.strip():
+            last_error = ValueError('Firmware retornou string de capacidades vazia')
+            continue
+        return raw
+    raise last_error or RuntimeError('Falha desconhecida na consulta DDC/CI')
 
 
 def enumerate_monitors(read_current=True):
@@ -312,9 +322,12 @@ def enumerate_monitors(read_current=True):
                     except OSError as exc:
                         m.read_error = str(exc)
                     try:
-                        m.supported_inputs = _capabilities(item.hPhysicalMonitor)
+                        m.capabilities_raw = _capabilities(item.hPhysicalMonitor)
+                        m.supported_inputs = parse_input_capabilities(m.capabilities_raw)
                         if m.supported_inputs is None:
-                            m.capabilities_error = 'VCP 0x60 não anunciado pelo monitor'
+                            m.capabilities_error = (
+                                'Capacidades recebidas, mas o monitor não anunciou '
+                                'valores para VCP 0x60')
                     except (OSError, ValueError) as exc:
                         m.capabilities_error = str(exc)
                 result.append(m)
