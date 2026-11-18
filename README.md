@@ -1,4 +1,4 @@
-# OpenMonitor Switch — MVP 0.4.2
+# OpenMonitor Switch — MVP 0.4.3
 
 Aplicativo Windows, open-source (MIT), para alterar a entrada de vídeo de monitores físicos usando DDC/CI e o comando VCP `0x60`. Interface Tkinter e API HTTP opcional. **Sem bibliotecas de terceiros.**
 
@@ -21,7 +21,7 @@ py app.py
 
 A interface **não exibe mais** campos de Nome, PC A, PC B, Ativo, Salvar, nem comandos globais de troca por PC. O aplicativo não pré-configura portas. A função **Identificar telas** continua mostrando o identificador no canto superior direito da tela.
 
-Se o firmware não anunciar capacidades, a interface mostrará esse limite e não criará botões fictícios. O valor VCP lido é mostrado separadamente, mas não prova que seja uma porta suportada.
+Se o firmware não anunciar capacidades, a interface mostrará esse limite e não criará botões fictícios. O comando `py app.py scan` agora apresenta `capabilities_raw` (resposta textual original do monitor), `capabilities_error` e `supported_inputs` para diagnóstico. A API nativa do Windows faz até duas tentativas de leitura em caso de falha, sem enviar comandos de troca. O valor VCP lido é mostrado separadamente, mas não prova que seja uma porta suportada.
 
 ## Linha de comando
 
