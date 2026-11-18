@@ -37,7 +37,8 @@ class Controller:
         return (self.backend.enumerate_monitors() if self.backend else enumerate_monitors())
 
     def register(self, monitor_id, label, pc_a, pc_b, enabled=True):
-        a, b = parse_code(pc_a), parse_code(pc_b)
+        a = None if pc_a is None or str(pc_a).strip() == '' else parse_code(pc_a)
+        b = None if pc_b is None or str(pc_b).strip() == '' else parse_code(pc_b)
         with self.lock:
             self.config['monitors'][monitor_id] = {
                 'label': str(label).strip() or monitor_id,
@@ -53,7 +54,9 @@ class Controller:
             entry = self.config['monitors'].get(monitor_id)
             if entry is None or not entry.get('enabled', True):
                 raise ValueError('Monitor não configurado ou desativado')
-            code = entry[target.lower()]
+            code = entry.get(target.lower())
+            if code is None:
+                raise ValueError(f'Entrada PC {target} não configurada: {entry.get("label", monitor_id)}')
             return (self.backend.set_input(monitor_id, code) if self.backend
                     else set_input(monitor_id, code))
 
@@ -61,6 +64,10 @@ class Controller:
         results = []
         for monitor_id, entry in list(self.config['monitors'].items()):
             if not entry.get('enabled', True):
+                continue
+            if entry.get(target.lower()) is None:
+                results.append({'id': monitor_id, 'ok': False, 'skipped': True,
+                                'error': f'PC {target} não configurado'})
                 continue
             try:
                 result = self.switch_one(monitor_id, target)
