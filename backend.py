@@ -245,7 +245,7 @@ def _read(handle):
 
 def _balanced_section(source, name):
     """Find a named parenthesized MCCS section, preserving nested items."""
-    match = re.search(r'(?i)(?:^|[\\s(])' + re.escape(name) + r'\\s*\\(', source)
+    match = re.search(r'(?i)(?:^|[\s(])' + re.escape(name) + r'\s*\(', source)
     if not match:
         return None
     opening = source.find('(', match.start())
