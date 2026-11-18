@@ -31,7 +31,7 @@ class Application(tk.Tk):
         super().__init__()
         self.controller = controller
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-        self.title('OpenMonitor Switch — MVP 0.4')
+        self.title('OpenMonitor Switch — MVP 0.4.1')
         self.geometry('1040x720')
         self.minsize(650, 510)
         self.widgets = []
@@ -131,11 +131,9 @@ class Application(tk.Tk):
                 (f'0x{monitor.current:02X} ({monitor.current})'
                  if monitor.current is not None else 'não disponível'),
                 foreground='#555').pack(anchor='w', pady=(0, 5))
-            # Only show inputs advertised by this monitor, plus the value
-            # actually observed. Never display the entire generic MCCS table.
+            # Strictly list only VCP 0x60 values advertised by the firmware.
+            # The current value is observed, NOT proof of selectable capability.
             supported = list(monitor.supported_inputs or [])
-            if monitor.current is not None and monitor.current not in supported:
-                supported.append(monitor.current)
             source_row = ttk.Frame(frame)
             source_row.pack(anchor='w', pady=(0, 7))
             ttk.Label(source_row, text='Entradas detectadas:').pack(side='left', padx=(0, 8))
@@ -157,15 +155,21 @@ class Application(tk.Tk):
             else:
                 ttk.Label(source_row, text='Nenhuma entrada informada via DDC/CI.').pack(side='left')
             ttk.Label(frame,
-                      text=('Códigos informados pelo monitor via DDC/CI; clique para selecionar.'
+                      text=('Entradas anunciadas pelo firmware via DDC/CI.'
                             if monitor.supported_inputs else
-                            'Capacidades indisponíveis; somente a entrada observada é exibida.'),
+                            'Lista de entradas não disponível pelo DDC/CI; nenhuma porta foi presumida.'),
                       foreground='#666').pack(anchor='w', pady=(0, 7))
+            if monitor.current is not None and monitor.current not in supported:
+                ttk.Label(frame, text=f'Leitura atual 0x{monitor.current:02X}: '
+                          'valor não anunciado nas capacidades; não é uma porta confirmada.',
+                          foreground='#9A6013').pack(anchor='w', pady=(0, 6))
             label = tk.StringVar(value=entry.get('label',
                 name if name not in ('Generic PnP Monitor', 'Generic Non-PnP Monitor')
                 else f'Monitor {pos + 1}'))
-            a = tk.StringVar(value=source_option(entry.get('a')))
-            b = tk.StringVar(value=source_option(entry.get('b')))
+            a = tk.StringVar(value=source_option(entry.get('a'))
+                             if entry.get('a') in supported else '')
+            b = tk.StringVar(value=source_option(entry.get('b'))
+                             if entry.get('b') in supported else '')
             enabled = tk.BooleanVar(value=entry.get('enabled', True))
             indicator = ttk.Frame(frame)
             indicator.pack(anchor='w', pady=(9, 0))
@@ -216,15 +220,15 @@ class Application(tk.Tk):
             ports = ttk.Frame(fields)
             ports.pack(fill='x', pady=(10, 0))
             ttk.Label(fields,
-                      text='Associe cada PC à entrada correta. Códigos personalizados podem ser digitados.',
+                      text='PC A e PC B: escolha apenas entradas anunciadas pelo DDC/CI.',
                       foreground='#555').pack(anchor='w', pady=(6, 0))
             ttk.Label(ports, text='PC A').pack(side='left')
             choices = ('',) + tuple(source_option(code) for code in supported)
             ttk.Combobox(ports, textvariable=a, values=choices,
-                         width=20, state='normal').pack(side='left', padx=(7, 18))
+                         width=20, state='readonly').pack(side='left', padx=(7, 18))
             ttk.Label(ports, text='PC B').pack(side='left')
             ttk.Combobox(ports, textvariable=b, values=choices,
-                         width=20, state='normal').pack(side='left', padx=(7, 18))
+                         width=20, state='readonly').pack(side='left', padx=(7, 18))
             ttk.Checkbutton(ports, text='Ativo', variable=enabled).pack(side='left')
             buttons = ttk.Frame(frame)
             buttons.pack(anchor='w', pady=(12, 0))
