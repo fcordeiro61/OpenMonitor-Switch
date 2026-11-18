@@ -75,7 +75,9 @@ class Controller:
                 raise ValueError(f'Entrada PC {target} não configurada: {entry.get("label", monitor_id)}')
 
             # Re-enumerate to ensure DISPLAYN still points to the same hardware.
-            monitors = self.backend.enumerate_monitors() if self.backend else enumerate_monitors()
+            # Identity preflight only: avoid a full capabilities/VCP read of every screen.
+            monitors = (self.backend.enumerate_monitors(read_current=False) if self.backend
+                        else enumerate_monitors(read_current=False))
             actual = next((m for m in monitors if m.id == monitor_id), None)
             if actual is None:
                 raise RuntimeError('Monitor indisponível; detecte novamente.')
@@ -110,10 +112,6 @@ class Controller:
             if (actual is None or not getattr(actual, 'hardware_id', None)
                     or actual.hardware_id.casefold() != detected.hardware_id.casefold()):
                 raise RuntimeError('Associação física mudou. Detecte novamente.')
-            if code not in (getattr(actual, 'supported_inputs', None) or []):
-                raise RuntimeError('Entrada deixou de ser anunciada pelo monitor. Detecte novamente.')
-            if actual.current == code:
-                return {'id': monitor_id, 'code': code, 'unchanged': True, 'sent': False}
             return (self.backend.set_input(monitor_id, code) if self.backend
                     else set_input(monitor_id, code))
 
