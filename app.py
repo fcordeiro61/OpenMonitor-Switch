@@ -31,7 +31,7 @@ class Application(tk.Tk):
         super().__init__()
         self.controller = controller
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-        self.title('OpenMonitor Switch — MVP 0.4.2')
+        self.title('OpenMonitor Switch — MVP 0.4.3')
         self.geometry('1040x720')
         self.minsize(650, 510)
         self._overlays = []
@@ -140,8 +140,11 @@ class Application(tk.Tk):
             ttk.Label(frame,
                       text=('Entradas anunciadas pelo firmware via DDC/CI.'
                             if monitor.supported_inputs else
-                            'Lista de entradas não disponível pelo DDC/CI; nenhuma porta foi presumida.'),
+                            'Nenhuma entrada anunciada via DDC/CI.'),
                       foreground='#666').pack(anchor='w', pady=(0, 7))
+            if monitor.capabilities_error:
+                ttk.Label(frame, text='Diagnóstico: ' + monitor.capabilities_error,
+                          foreground='#B3561B', wraplength=900).pack(anchor='w', pady=(0, 7))
             if monitor.current is not None and monitor.current not in supported:
                 ttk.Label(frame, text=f'Leitura atual 0x{monitor.current:02X}: '
                           'valor não anunciado nas capacidades; não é uma porta confirmada.',
