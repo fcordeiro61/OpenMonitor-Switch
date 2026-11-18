@@ -187,7 +187,8 @@ class Application(tk.Tk):
         # Tkinter's winfo_id() can refer to a child HWND. Only the real
         # top-level HWND uses virtual-desktop coordinates in SetWindowPos.
         native_displays = {
-            display: int(handle) for handle, display, _bounds in _enumerate()
+            display: (handle.value if hasattr(handle, 'value') else int(handle))
+            for handle, display, _bounds in _enumerate()
         }
         shown = set()
         failures = []
