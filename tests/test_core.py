@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-from backend import parse_code
+from backend import parse_code, source_name, source_option
 from core import Controller
 
 
@@ -23,6 +23,13 @@ class Tests(unittest.TestCase):
     def test_codes(self):
         self.assertEqual(parse_code('0x11'), 17)
         self.assertEqual(parse_code('15'), 15)
+        self.assertEqual(parse_code('DisplayPort (15)'), 15)
+        self.assertEqual(parse_code('HDMI 2 (18)'), 18)
+        self.assertEqual(parse_code('5'), 5)
+        self.assertEqual(source_name(5), 'Código 5')
+        self.assertEqual(source_name(15), 'DisplayPort')
+        self.assertEqual(source_option(15), 'DisplayPort (15)')
+        self.assertEqual(source_option(5), '5')
         with self.assertRaises(ValueError):
             parse_code('256')
         with self.assertRaises(ValueError):
