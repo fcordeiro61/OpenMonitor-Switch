@@ -85,6 +85,29 @@ class Controller:
             return (self.backend.set_input(monitor_id, code) if self.backend
                     else set_input(monitor_id, code))
 
+    def switch_input(self, monitor_id, value):
+        """Select a discovered input without assigning it to PC A or PC B."""
+        code = parse_code(value)
+        with self.lock:
+            detected = self._detected.get(monitor_id)
+            if detected is None or not getattr(detected, 'hardware_id', None):
+                raise RuntimeError('Detecte o monitor antes de selecionar uma entrada.')
+            known = getattr(detected, 'supported_inputs', None)
+            allowed = set(known or [])
+            if detected.current is not None:
+                allowed.add(detected.current)
+            if code not in allowed:
+                raise ValueError('Entrada não identificada nas capacidades deste monitor.')
+            monitors = self.backend.enumerate_monitors() if self.backend else enumerate_monitors()
+            actual = next((m for m in monitors if m.id == monitor_id), None)
+            if (actual is None or not getattr(actual, 'hardware_id', None)
+                    or actual.hardware_id.casefold() != detected.hardware_id.casefold()):
+                raise RuntimeError('Associação física mudou. Detecte novamente.')
+            if actual.current == code:
+                return {'id': monitor_id, 'code': code, 'unchanged': True, 'sent': False}
+            return (self.backend.set_input(monitor_id, code) if self.backend
+                    else set_input(monitor_id, code))
+
     def switch_all(self, target):
         results = []
         for monitor_id, entry in list(self.config['monitors'].items()):
