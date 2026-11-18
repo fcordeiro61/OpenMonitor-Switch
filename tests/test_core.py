@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-from backend import parse_code, source_name, source_option
+from backend import parse_code, source_name, source_option, parse_input_capabilities
 from core import Controller
 
 
@@ -35,6 +35,13 @@ class Tests(unittest.TestCase):
         with self.assertRaises(ValueError):
             parse_code(True)
 
+    def test_monitor_capabilities_parser(self):
+        raw = '(prot(monitor)type(LCD)model(TEST)vcp(10 12 60(01 03 0F 11) D6(01 04)))'
+        self.assertEqual(parse_input_capabilities(raw), [1, 3, 15, 17])
+        self.assertEqual(parse_input_capabilities('(vcp(60(05 0F)))'), [5, 15])
+        self.assertIsNone(parse_input_capabilities('(vcp(10 12 60))'))
+        self.assertIsNone(parse_input_capabilities('(vcp(10 12))'))
+
     def test_switch(self):
         with tempfile.TemporaryDirectory() as d:
             backend = FakeBackend()
@@ -64,6 +71,21 @@ class Tests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'não configurada'):
                 ctrl.switch_one('dell|0', 'B')
             self.assertIsNone(ctrl.config['monitors']['samsung|0']['a'])
+
+    def test_direct_input_requires_observed_or_advertised_code(self):
+        with tempfile.TemporaryDirectory() as d:
+            backend = FakeBackend()
+            ctrl = Controller(Path(d) / 'config.json', backend)
+            def detected():
+                return [SimpleNamespace(id='a|0', hardware_id='MONITOR\\\\a|0',
+                                        current=15, supported_inputs=[3, 15])]
+            backend.enumerate_monitors = detected
+            ctrl.scan()
+            result = ctrl.switch_input('a|0', 3)
+            self.assertEqual(result['code'], 3)
+            with self.assertRaisesRegex(ValueError, 'não identificada'):
+                ctrl.switch_input('a|0', 17)
+            self.assertEqual(backend.calls, [('a|0', 3)])
 
     def test_reenumeration_and_noop(self):
         with tempfile.TemporaryDirectory() as d:
