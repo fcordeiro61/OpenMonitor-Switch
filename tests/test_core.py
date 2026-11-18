@@ -41,6 +41,7 @@ class Tests(unittest.TestCase):
         self.assertEqual(parse_input_capabilities('(vcp(60(05 0F)))'), [5, 15])
         self.assertEqual(parse_input_capabilities('(prot(monitor)vcp(60(01 11)))'), [1, 17])
         self.assertEqual(parse_input_capabilities('(VCP(60(03 0f)))'), [3, 15])
+        self.assertEqual(parse_input_capabilities('(vcp(60(05 1B 20 FF)))'), [5, 27, 32, 255])
         self.assertIsNone(parse_input_capabilities('(vcp(10 12 60))'))
         self.assertIsNone(parse_input_capabilities('(vcp(10 12))'))
 
