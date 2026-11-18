@@ -1,4 +1,4 @@
-# OpenMonitor Switch — MVP 0.3.5
+# OpenMonitor Switch — MVP 0.4
 
 Aplicativo Windows, open-source (MIT), para alterar a entrada de vídeo de monitores físicos usando DDC/CI e o comando VCP `0x60`. Interface Tkinter e API HTTP opcional. **Sem bibliotecas de terceiros.**
 
@@ -54,7 +54,7 @@ Cada monitor pode ter um mapeamento de fonte diferente. A quantidade de monitore
 
 ```powershell
 py app.py scan   # detecta automaticamente todos os monitores
-py -3 app.py profile A
+py app.py profile A
 py -3 app.py profile B
 py -3 app.py switch '\\.\DISPLAY1|0' A
 ```
@@ -109,6 +109,14 @@ Antes de enviar VCP 0x60, o aplicativo relê a lista de monitores e confere o ha
 Cada monitor mostra etiquetas com os nomes comuns **VGA, DVI, DisplayPort, HDMI 1, HDMI 2**. Quando a leitura VCP 0x60 corresponde a um desses códigos, a etiqueta fica **azul**. Valores diferentes aparecem como **Código N**, sem identificação falsa (por exemplo, leitura 5 exibe Código 5). A identificação no canto superior direito também mostra a entrada atual. Os nomes comuns são apenas referência; não demonstram que o monitor possui todas essas conexões físicas.
 
 A seleção de PC A e PC B usa listas editáveis com nomes e valores decimais; é possível digitar um código personalizado (como `5` ou `0x05`). **Nenhuma entrada é atribuída automaticamente**.
+
+## Descoberta automática das entradas por DDC/CI
+
+O comando **Detectar monitores** consulta a API nativa do Windows `GetCapabilitiesStringLength` e `CapabilitiesRequestAndCapabilitiesReply` para obter a `Capabilities String` DDC/CI de cada monitor e examinar os valores anunciados em `vcp(60(...))`. Mostra botões **clicáveis somente para os códigos anunciados e para a entrada atual observada** (se não estiver na lista). Cada clique solicita confirmação antes de enviar VCP 0x60; não atribui a porta automaticamente ao PC A ou PC B.
+
+Não existem listas fixas de portas por monitor. Quando o dispositivo não fornece capacidades, mostra a entrada atual, se disponível, e permite configurar os códigos de PC A/PC B manualmente. A lista declarada pelo firmware **não é uma API de inventário físico de conectores** e pode estar incorreta; um código não padrão como `5` permanece `Código 5` até ser identificado com segurança.
+
+**Cuidado ao experimentar:** selecionar uma entrada pode causar perda do sinal e impedir novas solicitações DDC/CI a partir deste PC. Teste individualmente, com acesso ao menu físico do monitor para recuperação. Os controles `Todos → PC A/B` não devem ser usados antes de validar as portas de cada monitor.
 
 ## Estado visual da entrada
 
