@@ -1,4 +1,4 @@
-# OpenMonitor Switch — MVP 0.2.1
+# OpenMonitor Switch — MVP 0.3
 
 Aplicativo Windows, open-source (MIT), para alterar a entrada de vídeo de monitores físicos usando DDC/CI e o comando VCP `0x60`. Interface Tkinter e API HTTP opcional. **Sem bibliotecas de terceiros.**
 
@@ -26,7 +26,7 @@ Ou dê duplo clique em `iniciar.bat`.
 5. Clique **Salvar** e experimente **→ PC A** ou **→ PC B** por monitor.
 6. Depois de validar os monitores detectados, use **Todos → PC A/B**. O aplicativo enumera automaticamente quantas telas estão conectadas; não há parâmetro de quantidade.
 
-Os valores padrão na interface (`15` para A, `17` para B) são *placeholders ilustrativos* — **não** são uma atribuição confiável para o seu setup. Não clique antes de conferir os cabos. A configuração é salva automaticamente em `%APPDATA%\OpenMonitorSwitch\config.json`.
+**Nenhuma entrada é pré-configurada.** Os campos PC A e PC B começam vazios; o programa não usa o valor VCP atual como suposição de porta. Apenas entradas explicitamente preenchidas e salvas podem receber comandos. Perfis coletivos ignoram entradas vazias e informam quantas foram ignoradas. A configuração é salva automaticamente em `%APPDATA%\OpenMonitorSwitch\config.json`.
 
 ### Códigos VCP 0x60 comuns (MCCS)
 
@@ -98,9 +98,14 @@ Todas exigem o header `Authorization: Bearer TOKEN`.
 - Um monitor que não expõe DDC/CI pela porta/cabo atual pode exigir troca manual ou um switch HDMI/DP externo.
 - IDs por `\\.\DISPLAYN|índice` são temporários por configuração Windows; antes do uso definitivo vamos implementar associação persistente com EDID/serial.
 
+## Configuração parcial
+
+Cada monitor detectado aparece com o modelo EDID, sem supor quais portas cada computador utiliza. Se uma configuração antiga já tiver códigos salvos, eles serão preservados; remova-os pela interface ou limpe o arquivo de configuração se quiser começar do zero. Não confunda o valor de VCP lido com o mapeamento do PC A/B.
+
 ## Próximas versões
 
 - v0.2.1: identificação visual com verificação do monitor real, ajuste de DPI, leitura do modelo pelo Windows/EDID e layout reorganizado para não cortar botões.
+- v0.3: sem pré-configuração de entradas, suporte a campos vazios e bloqueio de envio sem configuração.
 - Futuro: identificação persistente por EDID, bandeja, hotkeys e testes de ida/volta por monitor.
 - v0.3: agentes nos dois PCs com recuperação/fallback e orquestração segura.
 - v1.0: UI Tauri/Rust, empacotamento EXE, inicialização automática e instalador.
