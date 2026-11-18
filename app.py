@@ -31,7 +31,7 @@ class Application(tk.Tk):
         super().__init__()
         self.controller = controller
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-        self.title('OpenMonitor Switch — MVP 0.3.3')
+        self.title('OpenMonitor Switch — MVP 0.3.4')
         self.geometry('1040x720')
         self.minsize(650, 510)
         self.widgets = []
@@ -186,6 +186,10 @@ class Application(tk.Tk):
             ttk.Entry(title_row, textvariable=label, width=36).pack(side='left', padx=(9, 0), fill='x', expand=True)
             ports = ttk.Frame(fields)
             ports.pack(fill='x', pady=(10, 0))
+            ttk.Label(fields,
+                      text='Entradas por monitor: informe o código VCP real (decimal ou 0xNN). '
+                           'Não há portas padrão.',
+                      foreground='#555').pack(anchor='w', pady=(6, 0))
             ttk.Label(ports, text='PC A').pack(side='left')
             ttk.Entry(ports, textvariable=a, width=7).pack(side='left', padx=(7, 18))
             ttk.Label(ports, text='PC B').pack(side='left')
