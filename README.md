@@ -1,4 +1,4 @@
-# OpenMonitor Switch — MVP 0.3.3
+# OpenMonitor Switch — MVP 0.3.4
 
 Aplicativo Windows, open-source (MIT), para alterar a entrada de vídeo de monitores físicos usando DDC/CI e o comando VCP `0x60`. Interface Tkinter e API HTTP opcional. **Sem bibliotecas de terceiros.**
 
@@ -29,6 +29,8 @@ Ou dê duplo clique em `iniciar.bat`.
 **Nenhuma entrada é pré-configurada.** Os campos PC A e PC B começam vazios; o programa não usa o valor VCP atual como suposição de porta. Apenas entradas explicitamente preenchidas e salvas podem receber comandos. Perfis coletivos ignoram entradas vazias e informam quantas foram ignoradas. A configuração é salva automaticamente em `%APPDATA%\OpenMonitorSwitch\config.json`.
 
 ### Códigos VCP 0x60 comuns (MCCS)
+
+**São exemplos, não valores fixos nem todas as possibilidades.** Os campos PC A e PC B aceitam qualquer código de 0 a 255, em decimal (`5`, `15`, `17`) ou hexadecimal (`0x05`, `0x0F`, `0x11`). Cada monitor pode ter várias entradas, e cada PC é associado apenas à entrada física correspondente. O VCP atualmente lido não identifica sozinho qual PC está conectado. A lista de entradas suportadas pode variar por modelo e firmware.
 
 | Porta | Hexadecimal | Decimal |
 |---|---:|---:|
