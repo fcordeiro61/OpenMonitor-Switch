@@ -10,7 +10,7 @@ class FakeBackend:
     def __init__(self):
         self.calls = []
 
-    def enumerate_monitors(self):
+    def enumerate_monitors(self, read_current=True):
         return [SimpleNamespace(id=monitor_id, hardware_id=f'MONITOR\\\\{monitor_id}',
                                 current=None, supported_inputs=[3, 15, 17]) for monitor_id in ['a|0', 'b|0', 'dell|0', 'samsung|0']]
 
@@ -79,7 +79,7 @@ class Tests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             backend = FakeBackend()
             ctrl = Controller(Path(d) / 'config.json', backend)
-            def detected():
+            def detected(read_current=True):
                 return [SimpleNamespace(id='a|0', hardware_id='MONITOR\\\\a|0',
                                         current=15, supported_inputs=[3, 15])]
             backend.enumerate_monitors = detected
@@ -94,7 +94,7 @@ class Tests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             backend = FakeBackend()
             ctrl = Controller(Path(d) / 'config.json', backend)
-            backend.enumerate_monitors = lambda: [
+            backend.enumerate_monitors = lambda read_current=True: [
                 SimpleNamespace(id='a|0', hardware_id='MONITOR\\\\a|0',
                                 current=5, supported_inputs=None)]
             ctrl.scan()
@@ -110,7 +110,7 @@ class Tests(unittest.TestCase):
             ctrl = Controller(Path(d) / 'config.json', backend)
             ctrl.scan()
             ctrl.register('a|0', 'Dell', 15, 17)
-            def changed():
+            def changed(read_current=True):
                 return [SimpleNamespace(id='a|0', hardware_id='MONITOR\\\\other',
                                         current=15, supported_inputs=[15, 17])]
             backend.enumerate_monitors = changed
