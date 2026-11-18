@@ -1,4 +1,4 @@
-# OpenMonitor Switch — MVP 0.3
+# OpenMonitor Switch — MVP 0.3.1
 
 Aplicativo Windows, open-source (MIT), para alterar a entrada de vídeo de monitores físicos usando DDC/CI e o comando VCP `0x60`. Interface Tkinter e API HTTP opcional. **Sem bibliotecas de terceiros.**
 
@@ -20,7 +20,7 @@ py -3 app.py
 Ou dê duplo clique em `iniciar.bat`.
 
 1. Clique em **Detectar monitores**.
-2. Clique em **Identificar telas**: por 7 segundos cada tela mostra seu identificador `DISPLAYN`, sem alterar a fonte de vídeo. **A ordem de detecção não é necessariamente a ordem física da sua mesa!**
+2. Clique em **Identificar telas**: por 8 segundos cada tela mostra seu identificador `DISPLAYN` em um painel azul no **canto superior direito**, sem alterar a fonte de vídeo. **A ordem de detecção não é necessariamente a ordem física da sua mesa!**
 3. Associe os identificadores aos modelos físicos e informe nomes como Dell P2314H, Samsung LS27AG32X e Samsung LT27T35. O aplicativo tenta ler o nome por `EnumDisplayDevicesW` e, quando possível, pelo EDID no Registro do Windows. Se a identificação continuar genérica, o programa **não inventa** o modelo.
 4. Configure para cada monitor os códigos de fonte de **PC A** e **PC B**.
 5. Clique **Salvar** e experimente **→ PC A** ou **→ PC B** por monitor.
@@ -97,6 +97,10 @@ Todas exigem o header `Authorization: Bearer TOKEN`.
 - Não implementa KVM de teclado/mouse, nem comuta sinais por software: somente controla o seletor de entrada do hardware.
 - Um monitor que não expõe DDC/CI pela porta/cabo atual pode exigir troca manual ou um switch HDMI/DP externo.
 - IDs por `\\.\DISPLAYN|índice` são temporários por configuração Windows; antes do uso definitivo vamos implementar associação persistente com EDID/serial.
+
+## Estado visual da entrada
+
+Ao detectar monitores, o aplicativo compara o VCP 0x60 lido com os códigos **explicitamente configurados** de PC A e PC B. O PC correspondente recebe um indicador **azul**. Sem correspondência (ou quando ambos os PCs possuem o mesmo código), o estado aparece como não identificado/ambíguo: o aplicativo não presume o PC ativo. Depois de uma troca, faz nova leitura para atualizar o indicador, que depende de resposta DDC/CI do monitor.
 
 ## Configuração parcial
 
