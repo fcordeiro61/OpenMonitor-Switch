@@ -1,4 +1,4 @@
-# OpenMonitor Switch — MVP 0.3.1
+# OpenMonitor Switch — MVP 0.3.2
 
 Aplicativo Windows, open-source (MIT), para alterar a entrada de vídeo de monitores físicos usando DDC/CI e o comando VCP `0x60`. Interface Tkinter e API HTTP opcional. **Sem bibliotecas de terceiros.**
 
@@ -14,7 +14,7 @@ Aplicativo Windows, open-source (MIT), para alterar a entrada de vídeo de monit
 Abra o PowerShell na pasta extraída:
 
 ```powershell
-py -3 app.py
+py app.py
 ```
 
 Ou dê duplo clique em `iniciar.bat`.
@@ -100,7 +100,7 @@ Todas exigem o header `Authorization: Bearer TOKEN`.
 
 ## Estado visual da entrada
 
-Ao detectar monitores, o aplicativo compara o VCP 0x60 lido com os códigos **explicitamente configurados** de PC A e PC B. O PC correspondente recebe um indicador **azul**. Sem correspondência (ou quando ambos os PCs possuem o mesmo código), o estado aparece como não identificado/ambíguo: o aplicativo não presume o PC ativo. Depois de uma troca, faz nova leitura para atualizar o indicador, que depende de resposta DDC/CI do monitor.
+Abaixo do nome de cada monitor na interface e dentro do painel de identificação no canto superior direito, aparecem PC A / PC B. Ao detectar monitores, o aplicativo compara o VCP 0x60 lido com os códigos **explicitamente configurados** de PC A e PC B. O PC correspondente recebe um indicador **azul**. Sem correspondência (ou quando ambos os PCs possuem o mesmo código), o estado aparece como pendente/ambíguo: o aplicativo não presume o PC ativo. Depois de uma troca, faz nova leitura para atualizar o indicador, que depende de resposta DDC/CI do monitor.
 
 ## Configuração parcial
 
