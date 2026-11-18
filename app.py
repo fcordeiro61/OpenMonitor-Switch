@@ -21,7 +21,7 @@ import sys
 import threading
 import tkinter as tk
 from tkinter import ttk, messagebox
-from backend import SOURCE_CODES
+from backend import SOURCE_CODES, SOURCE_OPTIONS, source_name, source_option, parse_code
 from core import Controller, CONFIG_PATH
 from api import serve
 
@@ -31,7 +31,7 @@ class Application(tk.Tk):
         super().__init__()
         self.controller = controller
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-        self.title('OpenMonitor Switch — MVP 0.3.4')
+        self.title('OpenMonitor Switch — MVP 0.3.5')
         self.geometry('1040x720')
         self.minsize(650, 510)
         self.widgets = []
@@ -130,12 +130,31 @@ class Application(tk.Tk):
             ttk.Label(frame, text=f'ID: {monitor.id}   |   VCP 0x60: ' +
                 (f'0x{monitor.current:02X} ({monitor.current})'
                  if monitor.current is not None else 'não disponível'),
-                foreground='#555').pack(anchor='w', pady=(0, 9))
+                foreground='#555').pack(anchor='w', pady=(0, 5))
+            # Show common MCCS inputs for reference, never imply that all
+            # listed inputs physically exist on the current monitor.
+            source_row = ttk.Frame(frame)
+            source_row.pack(anchor='w', pady=(0, 7))
+            ttk.Label(source_row, text='Entrada ativa:').pack(side='left', padx=(0, 8))
+            options = list(SOURCE_CODES.items())
+            if monitor.current is not None and monitor.current not in SOURCE_CODES.values():
+                options.append((f'Código {monitor.current}', monitor.current))
+            for source_label, source_code in options:
+                active_source = monitor.current is not None and monitor.current == source_code
+                tk.Label(source_row,
+                         text=('● ' if active_source else '') + source_label,
+                         bg='#0875DC' if active_source else '#E9EDF2',
+                         fg='#FFFFFF' if active_source else '#505B67',
+                         padx=9, pady=4,
+                         font=('Segoe UI', 9, 'bold' if active_source else 'normal')
+                         ).pack(side='left', padx=(0, 5))
+            ttk.Label(frame, text='Portas comuns (referência); a lista não confirma entradas físicas.',
+                      foreground='#666').pack(anchor='w', pady=(0, 7))
             label = tk.StringVar(value=entry.get('label',
                 name if name not in ('Generic PnP Monitor', 'Generic Non-PnP Monitor')
                 else f'Monitor {pos + 1}'))
-            a = tk.StringVar(value='' if entry.get('a') is None else str(entry['a']))
-            b = tk.StringVar(value='' if entry.get('b') is None else str(entry['b']))
+            a = tk.StringVar(value=source_option(entry.get('a')))
+            b = tk.StringVar(value=source_option(entry.get('b')))
             enabled = tk.BooleanVar(value=entry.get('enabled', True))
             indicator = ttk.Frame(frame)
             indicator.pack(anchor='w', pady=(9, 0))
@@ -150,7 +169,6 @@ class Application(tk.Tk):
             def update_indicator(*_, source=monitor.current, av=a, bv=b,
                                  label_a=pc_a_status, label_b=pc_b_status,
                                  unknown=unknown_status):
-                from backend import parse_code
                 def value(variable):
                     try:
                         return parse_code(variable.get()) if variable.get().strip() else None
@@ -191,9 +209,11 @@ class Application(tk.Tk):
                            'Não há portas padrão.',
                       foreground='#555').pack(anchor='w', pady=(6, 0))
             ttk.Label(ports, text='PC A').pack(side='left')
-            ttk.Entry(ports, textvariable=a, width=7).pack(side='left', padx=(7, 18))
+            ttk.Combobox(ports, textvariable=a, values=('',) + SOURCE_OPTIONS,
+                         width=20, state='normal').pack(side='left', padx=(7, 18))
             ttk.Label(ports, text='PC B').pack(side='left')
-            ttk.Entry(ports, textvariable=b, width=7).pack(side='left', padx=(7, 18))
+            ttk.Combobox(ports, textvariable=b, values=('',) + SOURCE_OPTIONS,
+                         width=20, state='normal').pack(side='left', padx=(7, 18))
             ttk.Checkbutton(ports, text='Ativo', variable=enabled).pack(side='left')
             buttons = ttk.Frame(frame)
             buttons.pack(anchor='w', pady=(12, 0))
@@ -256,7 +276,7 @@ class Application(tk.Tk):
             shown.add(monitor.display)
             left, top, right, bottom = monitor.bounds
             width = min(325, right - left - 30)
-            height = min(158, bottom - top - 30)
+            height = min(186, bottom - top - 30)
             if width < 100 or height < 80:
                 failures.append(f'{monitor.display}: dimensões inválidas')
                 continue
@@ -274,7 +294,9 @@ class Application(tk.Tk):
                      fg='#E5F1FF', font=('Segoe UI', 10),
                      anchor='center').pack(fill='x')
             # Status derived from the actual VCP value and saved mapping.
-            from backend import parse_code
+            tk.Label(panel, text='Entrada ativa: ' + source_name(monitor.current),
+                     bg='#163C68', fg='#FFFFFF',
+                     font=('Segoe UI', 10, 'bold')).pack(pady=(4, 0))
             entry = self.controller.config['monitors'].get(monitor.id, {})
             def configured_code(key):
                 raw = entry.get(key)
