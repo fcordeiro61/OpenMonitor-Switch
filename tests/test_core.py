@@ -12,7 +12,7 @@ class FakeBackend:
 
     def enumerate_monitors(self):
         return [SimpleNamespace(id=monitor_id, hardware_id=f'MONITOR\\\\{monitor_id}',
-                                current=None) for monitor_id in ['a|0', 'b|0', 'dell|0', 'samsung|0']]
+                                current=None, supported_inputs=[3, 15, 17]) for monitor_id in ['a|0', 'b|0', 'dell|0', 'samsung|0']]
 
     def set_input(self, monitor_id, code):
         self.calls.append((monitor_id, code))
@@ -87,6 +87,20 @@ class Tests(unittest.TestCase):
                 ctrl.switch_input('a|0', 17)
             self.assertEqual(backend.calls, [('a|0', 3)])
 
+    def test_no_fallback_to_observed_input(self):
+        with tempfile.TemporaryDirectory() as d:
+            backend = FakeBackend()
+            ctrl = Controller(Path(d) / 'config.json', backend)
+            backend.enumerate_monitors = lambda: [
+                SimpleNamespace(id='a|0', hardware_id='MONITOR\\\\a|0',
+                                current=5, supported_inputs=None)]
+            ctrl.scan()
+            with self.assertRaisesRegex(ValueError, 'indisponíveis'):
+                ctrl.register('a|0', 'Monitor', '5', '')
+            with self.assertRaisesRegex(ValueError, 'não identificada'):
+                ctrl.switch_input('a|0', 5)
+            self.assertEqual(backend.calls, [])
+
     def test_reenumeration_and_noop(self):
         with tempfile.TemporaryDirectory() as d:
             backend = FakeBackend()
@@ -95,13 +109,13 @@ class Tests(unittest.TestCase):
             ctrl.register('a|0', 'Dell', 15, 17)
             def changed():
                 return [SimpleNamespace(id='a|0', hardware_id='MONITOR\\\\other',
-                                        current=15)]
+                                        current=15, supported_inputs=[15, 17])]
             backend.enumerate_monitors = changed
             with self.assertRaisesRegex(RuntimeError, 'alterou a associação'):
                 ctrl.switch_one('a|0', 'B')
             self.assertEqual(backend.calls, [])
             backend.enumerate_monitors = lambda: [
-                SimpleNamespace(id='a|0', hardware_id='MONITOR\\\\a|0', current=15)]
+                SimpleNamespace(id='a|0', hardware_id='MONITOR\\\\a|0', current=15, supported_inputs=[15, 17])]
             result = ctrl.switch_one('a|0', 'A')
             self.assertTrue(result['unchanged'])
             self.assertEqual(backend.calls, [])
