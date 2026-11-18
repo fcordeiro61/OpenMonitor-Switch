@@ -77,6 +77,72 @@ if sys.platform == 'win32':
     dxva2.SetVCPFeature.restype = wintypes.BOOL
 
 
+    class DISPLAY_DEVICEW(ctypes.Structure):
+        _fields_ = [('cb', wintypes.DWORD), ('DeviceName', wintypes.WCHAR * 32),
+                    ('DeviceString', wintypes.WCHAR * 128), ('StateFlags', wintypes.DWORD),
+                    ('DeviceID', wintypes.WCHAR * 128), ('DeviceKey', wintypes.WCHAR * 128)]
+
+    user32.EnumDisplayDevicesW.argtypes = [
+        wintypes.LPCWSTR, wintypes.DWORD, ctypes.POINTER(DISPLAY_DEVICEW), wintypes.DWORD]
+    user32.EnumDisplayDevicesW.restype = wintypes.BOOL
+
+
+def _device_identity(display):
+    """Read friendly model associated with a GDI DISPLAY without guessing by order."""
+    if sys.platform != 'win32':
+        return None
+    mon = DISPLAY_DEVICEW()
+    mon.cb = ctypes.sizeof(mon)
+    if not user32.EnumDisplayDevicesW(display, 0, ctypes.byref(mon), 0):
+        return None
+    label = mon.DeviceString.strip()
+    if label and label.lower() not in ('generic pnp monitor', 'generic non-pnp monitor'):
+        return label
+    # Match the hardware identifier to a unique EDID entry in the Windows registry.
+    # If multiple entries match, do not guess which physical screen is which.
+    try:
+        import winreg
+        parts = mon.DeviceID.split('\\')
+        code = parts[1].upper() if len(parts) > 1 else ''
+        if not code:
+            return None
+        key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
+                             r'SYSTEM\CurrentControlSet\Enum\DISPLAY' + '\\' + code)
+        matches = set()
+        index = 0
+        while True:
+            try:
+                instance = winreg.EnumKey(key, index)
+            except OSError:
+                break
+            index += 1
+            try:
+                with winreg.OpenKey(key, instance + r'\Device Parameters') as sub:
+                    edid, _ = winreg.QueryValueEx(sub, 'EDID')
+                    name = _edid_name(edid)
+                    if name:
+                        matches.add(name)
+            except OSError:
+                continue
+        if len(matches) == 1:
+            return matches.pop()
+    except OSError:
+        pass
+    return None
+
+
+def _edid_name(data):
+    if not isinstance(data, bytes) or len(data) < 128 or data[:8] != bytes.fromhex('00ffffffffffff00'):
+        return None
+    for at in range(54, 126, 18):
+        descriptor = data[at:at + 18]
+        if len(descriptor) == 18 and descriptor[:5] == bytes.fromhex('000000fc00'):
+            name = descriptor[5:18].split(b'\\n')[0].strip(b'\\x00 ').decode('ascii', 'replace').strip()
+            if name:
+                return name
+    return None
+
+
 def _winerr(message):
     return OSError(f'{message} (erro Windows {ctypes.get_last_error()})')
 
@@ -137,7 +203,8 @@ def enumerate_monitors(read_current=True):
         try:
             for i in range(count):
                 item = array[i]
-                m = Monitor(f'{display}|{i}', display, item.szPhysicalMonitorDescription, i,
+                m = Monitor(f'{display}|{i}', display,
+                            _device_identity(display) or item.szPhysicalMonitorDescription, i,
                             bounds=bounds)
                 if read_current:
                     try:
