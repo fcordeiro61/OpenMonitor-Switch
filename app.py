@@ -31,7 +31,7 @@ class Application(tk.Tk):
         super().__init__()
         self.controller = controller
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-        self.title('OpenMonitor Switch — MVP 0.3.1')
+        self.title('OpenMonitor Switch — MVP 0.3.2')
         self.geometry('1040x720')
         self.minsize(650, 510)
         self.widgets = []
@@ -120,6 +120,10 @@ class Application(tk.Tk):
                   text=f'{monitor.display.split("DISPLAY")[-1]} — {name}', padding=12,
                   style='Monitor.TLabelframe')
             frame.pack(fill='x', pady=7)
+            header_line = ttk.Frame(frame)
+            header_line.pack(fill='x', pady=(0, 5))
+            ttk.Label(header_line, text=monitor.description,
+                      font=('Segoe UI', 11, 'bold')).pack(anchor='w')
             ttk.Label(frame, text=f'ID: {monitor.id}   |   VCP 0x60: ' +
                 (f'0x{monitor.current:02X} ({monitor.current})'
                  if monitor.current is not None else 'não disponível'),
@@ -130,19 +134,6 @@ class Application(tk.Tk):
             a = tk.StringVar(value='' if entry.get('a') is None else str(entry['a']))
             b = tk.StringVar(value='' if entry.get('b') is None else str(entry['b']))
             enabled = tk.BooleanVar(value=entry.get('enabled', True))
-            fields = ttk.Frame(frame)
-            fields.pack(fill='x')
-            title_row = ttk.Frame(fields)
-            title_row.pack(fill='x')
-            ttk.Label(title_row, text='Nome').pack(side='left')
-            ttk.Entry(title_row, textvariable=label, width=36).pack(side='left', padx=(9, 0), fill='x', expand=True)
-            ports = ttk.Frame(fields)
-            ports.pack(fill='x', pady=(10, 0))
-            ttk.Label(ports, text='PC A').pack(side='left')
-            ttk.Entry(ports, textvariable=a, width=7).pack(side='left', padx=(7, 18))
-            ttk.Label(ports, text='PC B').pack(side='left')
-            ttk.Entry(ports, textvariable=b, width=7).pack(side='left', padx=(7, 18))
-            ttk.Checkbutton(ports, text='Ativo', variable=enabled).pack(side='left')
             indicator = ttk.Frame(frame)
             indicator.pack(anchor='w', pady=(9, 0))
             ttk.Label(indicator, text='Entrada atual:').pack(side='left', padx=(0, 10))
@@ -172,7 +163,8 @@ class Application(tk.Tk):
                 elif source is None:
                     info = 'Leitura indisponível'
                 elif not active_a and not active_b:
-                    info = 'Não identificado'
+                    info = ('Configure as entradas' if ca is None or cb is None
+                            else f'Entrada atual: {source} (sem correspondência)')
                 else:
                     info = ''
                 label_a.configure(text=('● PC A' if active_a else '○ PC A'),
@@ -183,6 +175,19 @@ class Application(tk.Tk):
             a.trace_add('write', update_indicator)
             b.trace_add('write', update_indicator)
             update_indicator()
+            fields = ttk.Frame(frame)
+            fields.pack(fill='x')
+            title_row = ttk.Frame(fields)
+            title_row.pack(fill='x')
+            ttk.Label(title_row, text='Nome').pack(side='left')
+            ttk.Entry(title_row, textvariable=label, width=36).pack(side='left', padx=(9, 0), fill='x', expand=True)
+            ports = ttk.Frame(fields)
+            ports.pack(fill='x', pady=(10, 0))
+            ttk.Label(ports, text='PC A').pack(side='left')
+            ttk.Entry(ports, textvariable=a, width=7).pack(side='left', padx=(7, 18))
+            ttk.Label(ports, text='PC B').pack(side='left')
+            ttk.Entry(ports, textvariable=b, width=7).pack(side='left', padx=(7, 18))
+            ttk.Checkbutton(ports, text='Ativo', variable=enabled).pack(side='left')
             buttons = ttk.Frame(frame)
             buttons.pack(anchor='w', pady=(12, 0))
             ttk.Button(buttons, text='Salvar', style='Action.TButton',
@@ -244,7 +249,7 @@ class Application(tk.Tk):
             shown.add(monitor.display)
             left, top, right, bottom = monitor.bounds
             width = min(325, right - left - 30)
-            height = min(118, bottom - top - 30)
+            height = min(158, bottom - top - 30)
             if width < 100 or height < 80:
                 failures.append(f'{monitor.display}: dimensões inválidas')
                 continue
@@ -261,6 +266,30 @@ class Application(tk.Tk):
             tk.Label(panel, text=monitor.description, bg='#163C68',
                      fg='#E5F1FF', font=('Segoe UI', 10),
                      anchor='center').pack(fill='x')
+            # Status derived from the actual VCP value and saved mapping.
+            from backend import parse_code
+            entry = self.controller.config['monitors'].get(monitor.id, {})
+            def configured_code(key):
+                raw = entry.get(key)
+                try:
+                    return parse_code(raw) if raw is not None and str(raw).strip() else None
+                except (ValueError, TypeError):
+                    return None
+            code_a, code_b = configured_code('a'), configured_code('b')
+            active = None
+            if monitor.current is not None and code_a != code_b:
+                if code_a is not None and monitor.current == code_a:
+                    active = 'A'
+                elif code_b is not None and monitor.current == code_b:
+                    active = 'B'
+            statuses = tk.Frame(panel, bg='#163C68')
+            statuses.pack(pady=(6, 0))
+            for pc in ('A', 'B'):
+                selected = pc == active
+                tk.Label(statuses, text=('● ' if selected else '○ ') + 'PC ' + pc,
+                         bg='#163C68', fg='#42A5FF' if selected else '#B3C4D5',
+                         font=('Segoe UI', 11, 'bold' if selected else 'normal'),
+                         padx=12).pack(side='left')
             overlay.geometry(f'{width}x{height}+0+0')
             overlay.deiconify()
             overlay.update_idletasks()
