@@ -37,5 +37,19 @@ class Tests(unittest.TestCase):
             reload = Controller(Path(d) / 'config.json', backend)
             self.assertEqual(reload.config['monitors']['a|0']['b'], 3)
 
+    def test_unconfigured_sources_are_safe(self):
+        with tempfile.TemporaryDirectory() as d:
+            backend = FakeBackend()
+            ctrl = Controller(Path(d) / 'config.json', backend)
+            ctrl.register('dell|0', 'Dell', 15, None)
+            ctrl.register('samsung|0', 'Samsung', '', '')
+            result = ctrl.switch_all('A')
+            self.assertEqual(backend.calls, [('dell|0', 15)])
+            self.assertEqual(len(result), 2)
+            self.assertTrue(result[1]['skipped'])
+            with self.assertRaisesRegex(ValueError, 'não configurada'):
+                ctrl.switch_one('dell|0', 'B')
+            self.assertIsNone(ctrl.config['monitors']['samsung|0']['a'])
+
 if __name__ == '__main__':
     unittest.main()
