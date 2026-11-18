@@ -1,4 +1,4 @@
-# OpenMonitor Switch — MVP 0.4.1
+# OpenMonitor Switch — MVP 0.4.2
 
 Aplicativo Windows, open-source (MIT), para alterar a entrada de vídeo de monitores físicos usando DDC/CI e o comando VCP `0x60`. Interface Tkinter e API HTTP opcional. **Sem bibliotecas de terceiros.**
 
@@ -11,44 +11,17 @@ Aplicativo Windows, open-source (MIT), para alterar a entrada de vídeo de monit
 
 ## Como iniciar
 
-Abra o PowerShell na pasta extraída:
-
-```powershell
+```cmd
 py app.py
 ```
 
-Ou dê duplo clique em `iniciar.bat`.
+1. Clique em **Detectar monitores** para consultar os dispositivos por DDC/CI.
+2. As entradas anunciadas por cada monitor em `vcp(60(...))` aparecem como botões clicáveis. A entrada atual fica azul quando coincidir com um código anunciado.
+3. Clique em uma entrada e confirme para enviar o comando. Essa operação pode interromper o vídeo; teste com acesso ao menu físico.
 
-1. Clique em **Detectar monitores**.
-2. Clique em **Identificar telas**: por 8 segundos cada tela mostra seu identificador `DISPLAYN` em um painel azul no **canto superior direito**, sem alterar a fonte de vídeo. **A ordem de detecção não é necessariamente a ordem física da sua mesa!**
-3. Associe os identificadores aos modelos físicos e informe nomes como Dell P2314H, Samsung LS27AG32X e Samsung LT27T35. O aplicativo tenta ler o nome por `EnumDisplayDevicesW` e, quando possível, pelo EDID no Registro do Windows. Se a identificação continuar genérica, o programa **não inventa** o modelo.
-4. Configure para cada monitor os códigos de fonte de **PC A** e **PC B**.
-5. Clique **Salvar** e experimente **→ PC A** ou **→ PC B** por monitor.
-6. Depois de validar os monitores detectados, use **Todos → PC A/B**. O aplicativo enumera automaticamente quantas telas estão conectadas; não há parâmetro de quantidade.
+A interface **não exibe mais** campos de Nome, PC A, PC B, Ativo, Salvar, nem comandos globais de troca por PC. O aplicativo não pré-configura portas. A função **Identificar telas** continua mostrando o identificador no canto superior direito da tela.
 
-**Nenhuma entrada é pré-configurada.** Os campos PC A e PC B começam vazios; o programa não usa o valor VCP atual como suposição de porta. Apenas entradas explicitamente preenchidas e salvas podem receber comandos. Perfis coletivos ignoram entradas vazias e informam quantas foram ignoradas. A configuração é salva automaticamente em `%APPDATA%\OpenMonitorSwitch\config.json`.
-
-### Códigos VCP 0x60 comuns (MCCS)
-
-**São exemplos, não valores fixos nem todas as possibilidades.** Os campos PC A e PC B aceitam apenas códigos anunciados nas capacidades DDC/CI do monitor. Cada monitor pode ter várias entradas, e cada PC é associado apenas à entrada física correspondente. O VCP atualmente lido não identifica sozinho qual PC está conectado. A lista de entradas suportadas pode variar por modelo e firmware.
-
-| Porta | Hexadecimal | Decimal |
-|---|---:|---:|
-| VGA | 0x01 | 1 |
-| DVI | 0x03 | 3 |
-| DisplayPort | 0x0F | 15 |
-| HDMI 1 | 0x11 | 17 |
-| HDMI 2 | 0x12 | 18 |
-
-**Importante:** fabricantes podem implementar códigos diferentes ou ignorar certas solicitações. Use os códigos que funcionaram em seus testes; a API pode aceitar o comando sem o monitor efetivamente mudar de fonte. O programa não consegue validar visualmente a mudança.
-
-### Entradas físicas dos seus modelos (a confirmar conforme variante exata)
-
-- **Dell P2314H:** VGA, DVI-D, DisplayPort. *Não possui HDMI físico nativo*; HDMI→DVI depende de cabo/adaptador.
-- **Samsung LS27AG32X:** HDMI e DisplayPort.
-- **Samsung LT27T35 / série T350:** HDMI e VGA (D-Sub).
-
-Cada monitor pode ter um mapeamento de fonte diferente. A quantidade de monitores não é fixa.
+Se o firmware não anunciar capacidades, a interface mostrará esse limite e não criará botões fictícios. O valor VCP lido é mostrado separadamente, mas não prova que seja uma porta suportada.
 
 ## Linha de comando
 
