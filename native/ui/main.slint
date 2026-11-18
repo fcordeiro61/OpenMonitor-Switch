@@ -1,0 +1,120 @@
+import { Button, VerticalBox, HorizontalBox } from "std-widgets.slint";
+
+export component MainWindow inherits Window {
+    title: "OpenMonitor Switch — Nativo (prévia)";
+    preferred-width: 900px;
+    preferred-height: 570px;
+    background: #0e1525;
+    icon: @image-url("../assets/tray.svg");
+
+    callback hide-to-tray();
+
+    VerticalLayout {
+        padding: 28px;
+        spacing: 20px;
+
+        Rectangle {
+            height: 82px;
+            background: transparent;
+            VerticalLayout {
+                spacing: 6px;
+                Text {
+                    text: "OpenMonitor Switch";
+                    font-size: 28px;
+                    font-weight: 700;
+                    color: #f3f7ff;
+                }
+                Text {
+                    text: "Aplicativo nativo em Rust + Slint";
+                    font-size: 15px;
+                    color: #a4b3cb;
+                }
+            }
+        }
+
+        Rectangle {
+            height: 132px;
+            border-radius: 16px;
+            background: #19243a;
+            VerticalLayout {
+                padding: 22px;
+                spacing: 9px;
+                Text {
+                    text: "Migração em andamento";
+                    color: #e7eefb;
+                    font-weight: 700;
+                    font-size: 19px;
+                }
+                Text {
+                    text: "A interface e a bandeja já estão separadas da versão Python.";
+                    color: #b8c6dc;
+                    font-size: 14px;
+                }
+                Text {
+                    text: "Monitores, DDC/CI e Identificar telas ainda serão integrados.";
+                    color: #b8c6dc;
+                    font-size: 14px;
+                }
+            }
+        }
+
+        Rectangle {
+            height: 90px;
+            border-radius: 16px;
+            background: #131f34;
+            VerticalLayout {
+                padding: 18px;
+                spacing: 7px;
+                Text {
+                    text: "Monitores";
+                    font-size: 17px;
+                    font-weight: 600;
+                    color: #eff5ff;
+                }
+                Text {
+                    text: "Nenhum monitor consultado nesta prévia — sem dados simulados.";
+                    font-size: 13px;
+                    color: #9dafc9;
+                }
+            }
+        }
+        Rectangle { vertical-stretch: 1; background: transparent; }
+        HorizontalLayout {
+            spacing: 14px;
+            Rectangle { horizontal-stretch: 1; background: transparent; }
+            Button {
+                text: "Ocultar na bandeja";
+                clicked => { root.hide-to-tray(); }
+            }
+        }
+    }
+}
+
+export component AppTray inherits SystemTrayIcon {
+    icon: @image-url("../assets/tray.svg");
+    tooltip: "OpenMonitor Switch — prévia nativa";
+    callback open-window();
+    callback exit-app();
+
+    clicked => { root.open-window(); }
+    Menu {
+        MenuItem {
+            title: "Abrir OpenMonitor Switch";
+            activated => { root.open-window(); }
+        }
+        MenuSeparator {}
+        MenuItem {
+            title: "Identificar telas (em migração)";
+            enabled: false;
+        }
+        MenuItem {
+            title: "Detectar monitores (em migração)";
+            enabled: false;
+        }
+        MenuSeparator {}
+        MenuItem {
+            title: "Sair";
+            activated => { root.exit-app(); }
+        }
+    }
+}
