@@ -16,7 +16,7 @@ class Application(tk.Tk):
         super().__init__()
         self.controller = controller
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-        self.title('OpenMonitor Switch — MVP 0.1')
+        self.title('OpenMonitor Switch — MVP 0.2')
         self.geometry('880x590')
         self.minsize(750, 450)
         self.widgets = []
@@ -25,6 +25,7 @@ class Application(tk.Tk):
         top.pack(fill='x')
         ttk.Label(top, text='OpenMonitor Switch', font=('Segoe UI', 17, 'bold')).pack(side='left')
         ttk.Button(top, text='Detectar monitores', command=self.scan).pack(side='right')
+        ttk.Button(top, text='Identificar telas', command=self.identify_screens).pack(side='right', padx=8)
         ttk.Label(self, text='Configure a entrada de cada PC em cada monitor. Os códigos podem variar por modelo.',
                   padding=(16, 0)).pack(anchor='w')
         self.canvas = tk.Canvas(self, borderwidth=0, highlightthickness=0)
@@ -71,17 +72,17 @@ class Application(tk.Tk):
         for child in self.list_frame.winfo_children():
             child.destroy()
         self.widgets = []
+        self.last_monitors = monitors
         if not monitors:
             ttk.Label(self.list_frame, text='Nenhum monitor físico detectado. Verifique DDC/CI e os cabos.').pack(anchor='w')
         for pos, monitor in enumerate(monitors):
             entry = self.controller.config['monitors'].get(monitor.id, {})
-            defaults = ['Dell P2314H', 'Samsung LS27AG32X', 'Samsung LT27T35']
             box = ttk.LabelFrame(self.list_frame, text=f'Monitor detectado {pos + 1}: {monitor.description}', padding=10)
             box.pack(fill='x', pady=6)
             ttk.Label(box, text=f'ID: {monitor.id} | VCP 0x60: ' +
                       (f'0x{monitor.current:02X} ({monitor.current})' if monitor.current is not None else 'não disponível'),
                       foreground='#555').grid(row=0, column=0, columnspan=8, sticky='w', pady=(0, 7))
-            label = tk.StringVar(value=entry.get('label', defaults[pos] if pos < len(defaults) else monitor.description))
+            label = tk.StringVar(value=entry.get('label', monitor.description if monitor.description != 'Generic PnP Monitor' else f'Monitor {pos + 1}'))
             a = tk.StringVar(value=str(entry.get('a', 15)))
             b = tk.StringVar(value=str(entry.get('b', 17)))
             enabled = tk.BooleanVar(value=entry.get('enabled', True))
@@ -98,6 +99,45 @@ class Application(tk.Tk):
             ttk.Button(box, text='→ PC B', command=lambda m=monitor.id: self.switch_one(m, 'B')).grid(row=2, column=5)
             self.widgets.append((monitor.id, label, a, b, enabled))
         self.status.set(f'{len(monitors)} monitor(es) encontrado(s). Configuração: {CONFIG_PATH}')
+
+    def identify_screens(self):
+        """Identifica visualmente telas enumeradas sem trocar entradas de vídeo."""
+        monitors = getattr(self, 'last_monitors', None)
+        if not monitors:
+            self.status.set('Detecte os monitores primeiro.')
+            return
+        shown, overlays = set(), []
+        for monitor in monitors:
+            if monitor.display in shown or not monitor.bounds:
+                continue
+            shown.add(monitor.display)
+            left, top, right, bottom = monitor.bounds
+            width, height = min(440, right - left), min(170, bottom - top)
+            if width <= 0 or height <= 0:
+                continue
+            overlay = tk.Toplevel(self)
+            overlay.withdraw()
+            overlay.overrideredirect(True)
+            frame = ttk.Frame(overlay, padding=12)
+            frame.pack(fill='both', expand=True)
+            ttk.Label(frame, text='DISPLAY' + monitor.display.split('DISPLAY')[-1],
+                      font=('Segoe UI', 34, 'bold'), anchor='center').pack(fill='both', expand=True)
+            ttk.Label(frame, text='OpenMonitor Switch - identificação visual',
+                      anchor='center').pack(fill='x', pady=(0, 8))
+            overlay.geometry(f'{width}x{height}+0+0')
+            overlay.deiconify()
+            overlay.update_idletasks()
+            import ctypes
+            # Coordenadas absolutas também funcionam em telas à esquerda da principal.
+            ctypes.windll.user32.SetWindowPos(
+                overlay.winfo_id(), -1,
+                left + (right - left - width) // 2,
+                top + (bottom - top - height) // 2,
+                width, height, 0x0040)
+            overlays.append(overlay)
+        for overlay in overlays:
+            overlay.after(6000, overlay.destroy)
+        self.status.set(f'Identificando {len(overlays)} tela(s) por 6 segundos.')
 
     def save_one(self, monitor_id, label, a, b, enabled):
         try:
