@@ -1,6 +1,7 @@
 """Windows DDC/CI monitor backend, using only the Python standard library."""
 from __future__ import annotations
 import ctypes
+import re
 import sys
 from ctypes import wintypes
 from dataclasses import dataclass, asdict
@@ -40,6 +41,8 @@ class Monitor:
     bounds: tuple[int, int, int, int] | None = None
     hardware_id: str | None = None
     identity_source: str = 'ddc'
+    supported_inputs: list[int] | None = None
+    capabilities_error: str | None = None
 
     def to_dict(self):
         return asdict(self)
@@ -102,6 +105,11 @@ if sys.platform == 'win32':
     dxva2.GetVCPFeatureAndVCPFeatureReply.restype = wintypes.BOOL
     dxva2.SetVCPFeature.argtypes = [wintypes.HANDLE, ctypes.c_ubyte, wintypes.DWORD]
     dxva2.SetVCPFeature.restype = wintypes.BOOL
+    dxva2.GetCapabilitiesStringLength.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
+    dxva2.GetCapabilitiesStringLength.restype = wintypes.BOOL
+    dxva2.CapabilitiesRequestAndCapabilitiesReply.argtypes = [
+        wintypes.HANDLE, ctypes.c_void_p, wintypes.DWORD]
+    dxva2.CapabilitiesRequestAndCapabilitiesReply.restype = wintypes.BOOL
 
 
     class DISPLAY_DEVICEW(ctypes.Structure):
@@ -235,6 +243,50 @@ def _read(handle):
     return current.value
 
 
+def _balanced_section(source, name):
+    """Find a named parenthesized MCCS section, preserving nested items."""
+    match = re.search(r'(?i)(?:^|[\\s(])' + re.escape(name) + r'\\s*\\(', source)
+    if not match:
+        return None
+    opening = source.find('(', match.start())
+    depth = 1
+    for index in range(opening + 1, len(source)):
+        if source[index] == '(':
+            depth += 1
+        elif source[index] == ')':
+            depth -= 1
+            if depth == 0:
+                return source[opening + 1:index]
+    return None
+
+
+def parse_input_capabilities(source):
+    """Return supported values advertised by VCP 60, or None if absent."""
+    vcp = _balanced_section(source, 'vcp')
+    if vcp is None:
+        return None
+    inputs = _balanced_section(vcp, '60')
+    if inputs is None:
+        return None
+    tokens = re.findall(r'(?i)(?<![0-9a-f])[0-9a-f]{2}(?![0-9a-f])', inputs)
+    values = sorted(set(int(token, 16) for token in tokens))
+    return values or None
+
+
+def _capabilities(handle):
+    length = wintypes.DWORD()
+    if not dxva2.GetCapabilitiesStringLength(handle, ctypes.byref(length)):
+        raise _winerr('Monitor não respondeu à consulta de capacidades')
+    if not 2 <= length.value <= 65536:
+        raise ValueError('Comprimento inválido de capacidades DDC/CI')
+    buffer = ctypes.create_string_buffer(length.value + 1)
+    if not dxva2.CapabilitiesRequestAndCapabilitiesReply(
+            handle, ctypes.cast(buffer, ctypes.c_void_p), length.value):
+        raise _winerr('Monitor não retornou capacidades DDC/CI')
+    raw = buffer.value.decode('ascii', errors='replace')
+    return parse_input_capabilities(raw)
+
+
 def enumerate_monitors(read_current=True):
     result = []
     for hmon, display, bounds in _enumerate():
@@ -259,6 +311,12 @@ def enumerate_monitors(read_current=True):
                         m.current = _read(item.hPhysicalMonitor)
                     except OSError as exc:
                         m.read_error = str(exc)
+                    try:
+                        m.supported_inputs = _capabilities(item.hPhysicalMonitor)
+                        if m.supported_inputs is None:
+                            m.capabilities_error = 'VCP 0x60 não anunciado pelo monitor'
+                    except (OSError, ValueError) as exc:
+                        m.capabilities_error = str(exc)
                 result.append(m)
         finally:
             dxva2.DestroyPhysicalMonitors(count, array)
