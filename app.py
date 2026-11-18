@@ -129,7 +129,12 @@ class Application(tk.Tk):
             overlay.update_idletasks()
             import ctypes
             # Coordenadas absolutas também funcionam em telas à esquerda da principal.
-            ctypes.windll.user32.SetWindowPos(
+            from ctypes import wintypes
+            set_window_pos = ctypes.windll.user32.SetWindowPos
+            set_window_pos.argtypes = [wintypes.HWND, wintypes.HWND, ctypes.c_int,
+                                       ctypes.c_int, ctypes.c_int, ctypes.c_int, wintypes.UINT]
+            set_window_pos.restype = wintypes.BOOL
+            set_window_pos(
                 overlay.winfo_id(), -1,
                 left + (right - left - width) // 2,
                 top + (bottom - top - height) // 2,
