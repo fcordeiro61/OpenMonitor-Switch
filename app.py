@@ -31,7 +31,7 @@ class Application(tk.Tk):
         super().__init__()
         self.controller = controller
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-        self.title('OpenMonitor Switch — MVP 0.3')
+        self.title('OpenMonitor Switch — MVP 0.3.1')
         self.geometry('1040x720')
         self.minsize(650, 510)
         self.widgets = []
@@ -41,6 +41,12 @@ class Application(tk.Tk):
         style.configure('Title.TLabel', font=('Segoe UI', 17, 'bold'))
         style.configure('Monitor.TLabelframe.Label', font=('Segoe UI', 11, 'bold'))
         style.configure('Action.TButton', padding=(11, 8))
+        style.configure('ActivePC.TLabel', foreground='#0875DC',
+                        font=('Segoe UI', 10, 'bold'))
+        style.configure('IdlePC.TLabel', foreground='#767676',
+                        font=('Segoe UI', 10))
+        style.configure('UnknownPC.TLabel', foreground='#767676',
+                        font=('Segoe UI', 9))
         header = ttk.Frame(self, padding=(18, 16, 18, 10))
         header.pack(fill='x')
         ttk.Label(header, text='OpenMonitor Switch', style='Title.TLabel').pack(anchor='w')
@@ -137,6 +143,46 @@ class Application(tk.Tk):
             ttk.Label(ports, text='PC B').pack(side='left')
             ttk.Entry(ports, textvariable=b, width=7).pack(side='left', padx=(7, 18))
             ttk.Checkbutton(ports, text='Ativo', variable=enabled).pack(side='left')
+            indicator = ttk.Frame(frame)
+            indicator.pack(anchor='w', pady=(9, 0))
+            ttk.Label(indicator, text='Entrada atual:').pack(side='left', padx=(0, 10))
+            pc_a_status = ttk.Label(indicator, text='PC A', style='IdlePC.TLabel')
+            pc_a_status.pack(side='left', padx=(0, 16))
+            pc_b_status = ttk.Label(indicator, text='PC B', style='IdlePC.TLabel')
+            pc_b_status.pack(side='left', padx=(0, 16))
+            unknown_status = ttk.Label(indicator, text='', style='UnknownPC.TLabel')
+            unknown_status.pack(side='left')
+
+            def update_indicator(*_, source=monitor.current, av=a, bv=b,
+                                 label_a=pc_a_status, label_b=pc_b_status,
+                                 unknown=unknown_status):
+                from backend import parse_code
+                def value(variable):
+                    try:
+                        return parse_code(variable.get()) if variable.get().strip() else None
+                    except ValueError:
+                        return None
+                ca, cb = value(av), value(bv)
+                active_a = source is not None and ca is not None and source == ca
+                active_b = source is not None and cb is not None and source == cb
+                # The same VCP for both PCs is ambiguous: do not claim either is active.
+                if active_a and active_b:
+                    active_a = active_b = False
+                    info = 'Ambíguo: entradas iguais'
+                elif source is None:
+                    info = 'Leitura indisponível'
+                elif not active_a and not active_b:
+                    info = 'Não identificado'
+                else:
+                    info = ''
+                label_a.configure(text=('● PC A' if active_a else '○ PC A'),
+                                  style='ActivePC.TLabel' if active_a else 'IdlePC.TLabel')
+                label_b.configure(text=('● PC B' if active_b else '○ PC B'),
+                                  style='ActivePC.TLabel' if active_b else 'IdlePC.TLabel')
+                unknown.configure(text=info)
+            a.trace_add('write', update_indicator)
+            b.trace_add('write', update_indicator)
+            update_indicator()
             buttons = ttk.Frame(frame)
             buttons.pack(anchor='w', pady=(12, 0))
             ttk.Button(buttons, text='Salvar', style='Action.TButton',
@@ -148,9 +194,9 @@ class Application(tk.Tk):
             button_b = ttk.Button(buttons, text='→ PC B', style='Action.TButton',
                        command=lambda m=monitor.id: self.switch_one(m, 'B'))
             button_b.pack(side='left')
-            def refresh_buttons(*_):
-                button_a.configure(state='normal' if a.get().strip() else 'disabled')
-                button_b.configure(state='normal' if b.get().strip() else 'disabled')
+            def refresh_buttons(*_, av=a, bv=b, ba=button_a, bb=button_b):
+                ba.configure(state='normal' if av.get().strip() else 'disabled')
+                bb.configure(state='normal' if bv.get().strip() else 'disabled')
             a.trace_add('write', refresh_buttons)
             b.trace_add('write', refresh_buttons)
             refresh_buttons()
@@ -197,8 +243,8 @@ class Application(tk.Tk):
                 continue
             shown.add(monitor.display)
             left, top, right, bottom = monitor.bounds
-            width = min(430, right - left)
-            height = min(170, bottom - top)
+            width = min(325, right - left - 30)
+            height = min(118, bottom - top - 30)
             if width < 100 or height < 80:
                 failures.append(f'{monitor.display}: dimensões inválidas')
                 continue
@@ -206,12 +252,15 @@ class Application(tk.Tk):
             overlay = tk.Toplevel(self)
             overlay.withdraw()
             overlay.overrideredirect(True)
-            panel = ttk.Frame(overlay, padding=16)
+            panel = tk.Frame(overlay, bg='#163C68', padx=14, pady=10)
             panel.pack(fill='both', expand=True)
-            ttk.Label(panel, text=monitor.display.rsplit('\\', 1)[-1],
-                      font=('Segoe UI', 30, 'bold'),
-                      anchor='center').pack(fill='both', expand=True)
-            ttk.Label(panel, text=monitor.description, anchor='center').pack(fill='x')
+            tk.Label(panel, text=monitor.display.rsplit('\\', 1)[-1],
+                     bg='#163C68', fg='#FFFFFF',
+                     font=('Segoe UI', 21, 'bold'),
+                     anchor='center').pack(fill='both', expand=True)
+            tk.Label(panel, text=monitor.description, bg='#163C68',
+                     fg='#E5F1FF', font=('Segoe UI', 10),
+                     anchor='center').pack(fill='x')
             overlay.geometry(f'{width}x{height}+0+0')
             overlay.deiconify()
             overlay.update_idletasks()
@@ -222,8 +271,8 @@ class Application(tk.Tk):
                 overlay.destroy()
                 failures.append(f'{monitor.display}: HWND indisponível')
                 continue
-            x = left + (right - left - width) // 2
-            y = top + (bottom - top - height) // 2
+            x = right - width - 20
+            y = top + 20
             # SWP_SHOWWINDOW=0x0040, keeps the label on top while visible.
             ok = setpos(hwnd, -1, x, y, width, height, 0x0040)
             expected = native_displays.get(monitor.display)
@@ -249,6 +298,10 @@ class Application(tk.Tk):
         for monitor_id, label, a, b, enabled in self.widgets:
             self.controller.register(monitor_id, label.get(), a.get(), b.get(), enabled.get())
 
+    def _after_switch(self, message):
+        self.status.set(message)
+        self.scan()
+
     def switch_one(self, monitor_id, target):
         try:
             self.save_all()
@@ -256,7 +309,8 @@ class Application(tk.Tk):
             messagebox.showerror('Configuração inválida', str(exc))
             return
         self.task(lambda: self.controller.switch_one(monitor_id, target),
-                  lambda result: self.status.set(f'Comando enviado ao monitor {monitor_id}: PC {target}. Sem confirmação visual.'))
+                  lambda result: self._after_switch(
+                      f'Comando enviado ao monitor {monitor_id}: PC {target}. Estado será relido.'))
 
     def switch_all(self, target):
         try:
@@ -272,7 +326,8 @@ class Application(tk.Tk):
             if errors:
                 messagebox.showwarning('Falhas de envio',
                     '\n'.join(f"{r['id']}: {r['error']}" for r in errors))
-        self.task(lambda: self.controller.switch_all(target), success)
+        self.task(lambda: self.controller.switch_all(target),
+                  lambda results: (success(results), self.scan()))
 
 
 def main():
