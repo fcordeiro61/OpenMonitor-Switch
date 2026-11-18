@@ -359,7 +359,7 @@ class Application(tk.Tk):
     def choose_input(self, monitor_id, code, title):
         if not messagebox.askyesno(
                 'Confirmar troca de entrada',
-                f'Selecionar {title} no monitor {monitor_id}?\\n\\n'
+                f'Selecionar {title} no monitor {monitor_id}?\n\n'
                 'A tela pode perder o sinal. Isso não altera a associação PC A/PC B.'):
             return
         self.task(lambda: self.controller.switch_input(monitor_id, code),
