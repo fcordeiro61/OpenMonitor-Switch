@@ -158,17 +158,24 @@ class Application(tk.Tk):
         self.status.set(f'{len(monitors)} monitor(es) encontrado(s). Configuração: {CONFIG_PATH}')
 
     def identify_screens(self):
-        """Show DISPLAY labels on matching physical screens, never guessed."""
+        """Show the GDI DISPLAY identifier on each matching physical screen."""
         import ctypes
         from ctypes import wintypes
+        from backend import _enumerate
+
         if not getattr(self, 'last_monitors', None):
             self.status.set('Detecte os monitores primeiro.')
             return
+
         for overlay in self._overlays:
             if overlay.winfo_exists():
                 overlay.destroy()
         self._overlays = []
+
         user32 = ctypes.WinDLL('user32', use_last_error=True)
+        get_ancestor = user32.GetAncestor
+        get_ancestor.argtypes = [wintypes.HWND, wintypes.UINT]
+        get_ancestor.restype = wintypes.HWND
         setpos = user32.SetWindowPos
         setpos.argtypes = [wintypes.HWND, wintypes.HWND, ctypes.c_int, ctypes.c_int,
                            ctypes.c_int, ctypes.c_int, wintypes.UINT]
@@ -176,46 +183,59 @@ class Application(tk.Tk):
         monitor_from_window = user32.MonitorFromWindow
         monitor_from_window.argtypes = [wintypes.HWND, wintypes.DWORD]
         monitor_from_window.restype = wintypes.HMONITOR
-        from backend import _enumerate
-        display_handles = {display: (hmon.value if hasattr(hmon, 'value') else int(hmon))
-                           for hmon, display, bounds in _enumerate()}
-        seen = set()
-        failed = []
+
+        # Tkinter's winfo_id() can refer to a child HWND. Only the real
+        # top-level HWND uses virtual-desktop coordinates in SetWindowPos.
+        native_displays = {
+            display: int(handle) for handle, display, _bounds in _enumerate()
+        }
+        shown = set()
+        failures = []
         for monitor in self.last_monitors:
-            if monitor.display in seen or not monitor.bounds:
+            if monitor.display in shown or not monitor.bounds:
                 continue
-            seen.add(monitor.display)
+            shown.add(monitor.display)
             left, top, right, bottom = monitor.bounds
-            width, height = min(430, right - left), min(170, bottom - top)
-            if width <= 0 or height <= 0:
+            width = min(430, right - left)
+            height = min(170, bottom - top)
+            if width < 100 or height < 80:
+                failures.append(f'{monitor.display}: dimensões inválidas')
                 continue
+
             overlay = tk.Toplevel(self)
             overlay.withdraw()
             overlay.overrideredirect(True)
-            panel = ttk.Frame(overlay, padding=20)
+            panel = ttk.Frame(overlay, padding=16)
             panel.pack(fill='both', expand=True)
-            identifier = monitor.display.rsplit('DISPLAY', 1)[-1]
-            ttk.Label(panel, text=f'DISPLAY{identifier}',
-                      font=('Segoe UI', 30, 'bold'), anchor='center').pack(fill='both', expand=True)
-            ttk.Label(panel, text=monitor.description,
-                      font=('Segoe UI', 11), anchor='center').pack(fill='x')
+            ttk.Label(panel, text=monitor.display.rsplit('\\', 1)[-1],
+                      font=('Segoe UI', 30, 'bold'),
+                      anchor='center').pack(fill='both', expand=True)
+            ttk.Label(panel, text=monitor.description, anchor='center').pack(fill='x')
             overlay.geometry(f'{width}x{height}+0+0')
             overlay.deiconify()
             overlay.update_idletasks()
+
+            # GA_ROOT=2: outer window, not Tk's embedded child HWND.
+            hwnd = get_ancestor(overlay.winfo_id(), 2)
+            if not hwnd:
+                overlay.destroy()
+                failures.append(f'{monitor.display}: HWND indisponível')
+                continue
             x = left + (right - left - width) // 2
             y = top + (bottom - top - height) // 2
-            ok = setpos(overlay.winfo_id(), -1, x, y, width, height, 0x0040)
-            overlay.update_idletasks()
-            actual = int(monitor_from_window(overlay.winfo_id(), 2))
-            expected = display_handles.get(monitor.display)
-            if not ok or expected != actual:
+            # SWP_SHOWWINDOW=0x0040, keeps the label on top while visible.
+            ok = setpos(hwnd, -1, x, y, width, height, 0x0040)
+            expected = native_displays.get(monitor.display)
+            actual = int(monitor_from_window(hwnd, 2)) if ok else None
+            if not ok or actual != expected:
                 overlay.destroy()
-                failed.append(monitor.display)
+                failures.append(f'{monitor.display}: posição não confirmada')
                 continue
-            overlay.after(7000, overlay.destroy)
+            overlay.after(8000, overlay.destroy)
             self._overlays.append(overlay)
-        self.status.set(f'Identificação: {len(self._overlays)} tela(s).' +
-                        (f' Não foi possível posicionar: {", ".join(failed)}.' if failed else ''))
+
+        self.status.set(f'Identificação: {len(self._overlays)}/{len(shown)} tela(s) exibida(s).' +
+                        (' Falhas: ' + '; '.join(failures) if failures else ''))
 
     def save_one(self, monitor_id, label, a, b, enabled):
         try:
