@@ -31,7 +31,7 @@ class Application(tk.Tk):
         super().__init__()
         self.controller = controller
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-        self.title('OpenMonitor Switch — MVP 0.4.3')
+        self.title('OpenMonitor Switch — MVP 0.4.4')
         self.geometry('1040x720')
         self.minsize(650, 510)
         self._overlays = []
@@ -240,19 +240,13 @@ class Application(tk.Tk):
                         (' Falhas: ' + '; '.join(failures) if failures else ''))
 
     def choose_input(self, monitor_id, code, title):
-        if not messagebox.askyesno(
-                'Confirmar troca de entrada',
-                f'Selecionar {title} no monitor {monitor_id}?\n\n'
-                'A tela pode perder o sinal. Isso não altera a associação PC A/PC B.'):
-            return
         self.task(lambda: self.controller.switch_input(monitor_id, code),
                   lambda result: self._after_switch(
-                      'Entrada já estava selecionada.' if result.get('unchanged')
-                      else f'Comando enviado: {title} no monitor {monitor_id}.'))
+                      f'Comando enviado: {title} no monitor {monitor_id}. '
+                      'Clique em Detectar monitores para atualizar a leitura.'))
 
     def _after_switch(self, message):
         self.status.set(message)
-        self.scan()
 
 def main():
     parser = argparse.ArgumentParser(description='OpenMonitor Switch')
