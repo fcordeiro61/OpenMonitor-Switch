@@ -39,6 +39,8 @@ class Tests(unittest.TestCase):
         raw = '(prot(monitor)type(LCD)model(TEST)vcp(10 12 60(01 03 0F 11) D6(01 04)))'
         self.assertEqual(parse_input_capabilities(raw), [1, 3, 15, 17])
         self.assertEqual(parse_input_capabilities('(vcp(60(05 0F)))'), [5, 15])
+        self.assertEqual(parse_input_capabilities('(prot(monitor)vcp(60(01 11)))'), [1, 17])
+        self.assertEqual(parse_input_capabilities('(VCP(60(03 0f)))'), [3, 15])
         self.assertIsNone(parse_input_capabilities('(vcp(10 12 60))'))
         self.assertIsNone(parse_input_capabilities('(vcp(10 12))'))
 
