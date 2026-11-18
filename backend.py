@@ -19,6 +19,8 @@ class Monitor:
     current: int | None = None
     read_error: str | None = None
     bounds: tuple[int, int, int, int] | None = None
+    hardware_id: str | None = None
+    identity_source: str = 'ddc'
 
     def to_dict(self):
         return asdict(self)
@@ -88,47 +90,66 @@ if sys.platform == 'win32':
 
 
 def _device_identity(display):
-    """Read friendly model associated with a GDI DISPLAY without guessing by order."""
+    """Resolve a screen using its GDI display name, not display order.
+
+    EnumDisplayDevicesW(display, index) lists monitor devices belonging to the
+    adapter. DeviceString may be generic; the monitor hardware ID can be used
+    to read an EDID model name from the matching Windows registry entry.
+    """
     if sys.platform != 'win32':
+        return None, None, 'unsupported'
+    devices = []
+    index = 0
+    while True:
+        mon = DISPLAY_DEVICEW()
+        mon.cb = ctypes.sizeof(mon)
+        if not user32.EnumDisplayDevicesW(display, index, ctypes.byref(mon), 0):
+            break
+        devices.append(mon)
+        index += 1
+    if not devices:
+        return None, None, 'no_monitor_device'
+    for mon in devices:
+        label = mon.DeviceString.strip()
+        hardware_id = mon.DeviceID.strip()
+        if label and label.casefold() not in ('generic pnp monitor', 'generic non-pnp monitor'):
+            return label, hardware_id, 'windows'
+        name = _registry_edid_name(hardware_id)
+        if name:
+            return name, hardware_id, 'edid'
+    return None, devices[0].DeviceID.strip(), 'generic'
+
+
+def _registry_edid_name(hardware_id):
+    import winreg
+    parts = hardware_id.split('\\')
+    if len(parts) < 2 or parts[0].upper() not in ('MONITOR', 'DISPLAY'):
         return None
-    mon = DISPLAY_DEVICEW()
-    mon.cb = ctypes.sizeof(mon)
-    if not user32.EnumDisplayDevicesW(display, 0, ctypes.byref(mon), 0):
+    code = parts[1]
+    if not code or '/' in code:
         return None
-    label = mon.DeviceString.strip()
-    if label and label.lower() not in ('generic pnp monitor', 'generic non-pnp monitor'):
-        return label
-    # Match the hardware identifier to a unique EDID entry in the Windows registry.
-    # If multiple entries match, do not guess which physical screen is which.
+    path = 'SYSTEM\\CurrentControlSet\\Enum\\DISPLAY\\' + code
+    names = set()
     try:
-        import winreg
-        parts = mon.DeviceID.split('\\')
-        code = parts[1].upper() if len(parts) > 1 else ''
-        if not code:
-            return None
-        key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
-                             r'SYSTEM\CurrentControlSet\Enum\DISPLAY' + '\\' + code)
-        matches = set()
-        index = 0
-        while True:
-            try:
-                instance = winreg.EnumKey(key, index)
-            except OSError:
-                break
-            index += 1
-            try:
-                with winreg.OpenKey(key, instance + r'\Device Parameters') as sub:
-                    edid, _ = winreg.QueryValueEx(sub, 'EDID')
-                    name = _edid_name(edid)
-                    if name:
-                        matches.add(name)
-            except OSError:
-                continue
-        if len(matches) == 1:
-            return matches.pop()
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, path) as key:
+            i = 0
+            while True:
+                try:
+                    instance = winreg.EnumKey(key, i)
+                except OSError:
+                    break
+                i += 1
+                try:
+                    with winreg.OpenKey(key, instance + '\\Device Parameters') as sub:
+                        data, _ = winreg.QueryValueEx(sub, 'EDID')
+                        name = _edid_name(data)
+                        if name:
+                            names.add(name)
+                except OSError:
+                    continue
     except OSError:
-        pass
-    return None
+        return None
+    return next(iter(names)) if len(names) == 1 else None
 
 
 def _edid_name(data):
@@ -201,11 +222,13 @@ def enumerate_monitors(read_current=True):
         if not array:
             continue
         try:
+            model, hardware_id, identity_source = _device_identity(display)
             for i in range(count):
                 item = array[i]
                 m = Monitor(f'{display}|{i}', display,
-                            _device_identity(display) or item.szPhysicalMonitorDescription, i,
-                            bounds=bounds)
+                            model or item.szPhysicalMonitorDescription, i,
+                            bounds=bounds, hardware_id=hardware_id,
+                            identity_source=identity_source if model else 'ddc')
                 if read_current:
                     try:
                         m.current = _read(item.hPhysicalMonitor)
