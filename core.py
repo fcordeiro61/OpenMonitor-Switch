@@ -17,6 +17,7 @@ class Controller:
         self.backend = backend
         self.lock = Lock()
         self.config = self._load()
+        self._detected = {}
 
     def _load(self):
         if self.path.exists():
@@ -34,15 +35,24 @@ class Controller:
         temp.replace(self.path)
 
     def scan(self):
-        return (self.backend.enumerate_monitors() if self.backend else enumerate_monitors())
+        monitors = self.backend.enumerate_monitors() if self.backend else enumerate_monitors()
+        self._detected = {m.id: m for m in monitors}
+        return monitors
 
     def register(self, monitor_id, label, pc_a, pc_b, enabled=True):
         a = None if pc_a is None or str(pc_a).strip() == '' else parse_code(pc_a)
         b = None if pc_b is None or str(pc_b).strip() == '' else parse_code(pc_b)
         with self.lock:
+            previous = self.config['monitors'].get(monitor_id, {})
+            detected = self._detected.get(monitor_id)
+            hardware_id = previous.get('hardware_id') or getattr(detected, 'hardware_id', None)
+            if previous.get('hardware_id') and detected and getattr(detected, 'hardware_id', None) and (
+                    previous['hardware_id'].casefold() != detected.hardware_id.casefold()):
+                raise RuntimeError('O monitor mudou de DISPLAY. Revise o mapeamento antes de salvar.')
             self.config['monitors'][monitor_id] = {
                 'label': str(label).strip() or monitor_id,
-                'a': a, 'b': b, 'enabled': bool(enabled)
+                'a': a, 'b': b, 'enabled': bool(enabled),
+                'hardware_id': hardware_id
             }
             self.save()
 
@@ -57,6 +67,21 @@ class Controller:
             code = entry.get(target.lower())
             if code is None:
                 raise ValueError(f'Entrada PC {target} não configurada: {entry.get("label", monitor_id)}')
+
+            # Re-enumerate to ensure DISPLAYN still points to the same hardware.
+            monitors = self.backend.enumerate_monitors() if self.backend else enumerate_monitors()
+            actual = next((m for m in monitors if m.id == monitor_id), None)
+            if actual is None:
+                raise RuntimeError('Monitor indisponível; detecte novamente.')
+            expected_id = entry.get('hardware_id')
+            actual_id = getattr(actual, 'hardware_id', None)
+            if not expected_id or not actual_id:
+                raise RuntimeError('Identidade do monitor não confirmada. Detecte e salve novamente.')
+            if expected_id.casefold() != actual_id.casefold():
+                raise RuntimeError('O Windows alterou a associação DISPLAY/monitor. Detecte e salve novamente.')
+            if getattr(actual, 'current', None) == code:
+                return {'id': monitor_id, 'code': code, 'sent': False,
+                        'unchanged': True, 'message': 'Entrada já selecionada'}
             return (self.backend.set_input(monitor_id, code) if self.backend
                     else set_input(monitor_id, code))
 
