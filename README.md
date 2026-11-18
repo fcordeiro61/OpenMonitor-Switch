@@ -1,4 +1,4 @@
-# OpenMonitor Switch — MVP 0.4.3
+# OpenMonitor Switch — MVP 0.4.4
 
 Aplicativo Windows, open-source (MIT), para alterar a entrada de vídeo de monitores físicos usando DDC/CI e o comando VCP `0x60`. Interface Tkinter e API HTTP opcional. **Sem bibliotecas de terceiros.**
 
@@ -17,11 +17,15 @@ py app.py
 
 1. Clique em **Detectar monitores** para consultar os dispositivos por DDC/CI.
 2. As entradas anunciadas por cada monitor em `vcp(60(...))` aparecem como botões clicáveis. A entrada atual fica azul quando coincidir com um código anunciado.
-3. Clique em uma entrada e confirme para enviar o comando. Essa operação pode interromper o vídeo; teste com acesso ao menu físico.
+3. Clique em uma entrada para enviar o comando diretamente, sem confirmação. Essa operação pode interromper o vídeo; teste com acesso ao menu físico.
 
 A interface **não exibe mais** campos de Nome, PC A, PC B, Ativo, Salvar, nem comandos globais de troca por PC. O aplicativo não pré-configura portas. A função **Identificar telas** continua mostrando o identificador no canto superior direito da tela.
 
 Se o firmware não anunciar capacidades, a interface mostrará esse limite e não criará botões fictícios. O comando `py app.py scan` agora apresenta `capabilities_raw` (resposta textual original do monitor), `capabilities_error` e `supported_inputs` para diagnóstico. A API nativa do Windows faz até duas tentativas de leitura em caso de falha, sem enviar comandos de troca. O valor VCP lido é mostrado separadamente, mas não prova que seja uma porta suportada.
+
+## Desempenho na troca
+
+A seleção direta não consulta novamente as capacidades de todos os monitores antes de escrever o VCP 0x60. A segurança continua verificando a identidade física do monitor usando enumeração sem leitura de capacidades. Após o comando, o aplicativo não faz uma varredura DDC/CI completa automaticamente: use **Detectar monitores** quando precisar atualizar a indicação da porta ativa. A confirmação de troca foi removida.
 
 ## Linha de comando
 
@@ -85,7 +89,7 @@ A seleção de PC A e PC B usa listas não editáveis contendo apenas códigos a
 
 ## Descoberta automática das entradas por DDC/CI
 
-O comando **Detectar monitores** consulta a API nativa do Windows `GetCapabilitiesStringLength` e `CapabilitiesRequestAndCapabilitiesReply` para obter a `Capabilities String` DDC/CI de cada monitor e examinar os valores anunciados em `vcp(60(...))`. Mostra botões **clicáveis somente para os códigos anunciados**. A entrada atual é indicada separadamente; se seu valor não estiver anunciado nas capacidades, não se torna um botão nem é considerada porta confirmada. Cada clique solicita confirmação antes de enviar VCP 0x60; não atribui a porta automaticamente ao PC A ou PC B.
+O comando **Detectar monitores** consulta a API nativa do Windows `GetCapabilitiesStringLength` e `CapabilitiesRequestAndCapabilitiesReply` para obter a `Capabilities String` DDC/CI de cada monitor e examinar os valores anunciados em `vcp(60(...))`. Mostra botões **clicáveis somente para os códigos anunciados**. A entrada atual é indicada separadamente; se seu valor não estiver anunciado nas capacidades, não se torna um botão nem é considerada porta confirmada. Cada clique envia VCP 0x60 diretamente, sem diálogo de confirmação; não atribui a porta automaticamente ao PC A ou PC B.
 
 Não existem listas fixas de portas por monitor. Quando o dispositivo não fornece capacidades, mostra a entrada atual, se disponível, **mas não oferece portas nem permite configurar PC A/PC B**. A descoberta deve vir exclusivamente do DDC/CI. A lista declarada pelo firmware **não é uma API de inventário físico de conectores** e pode estar incorreta; um código não padrão como `5` permanece `Código 5` até ser identificado com segurança.
 
